@@ -1,0 +1,602 @@
+{
+  "info": {
+    "_postman_id": "41d9110c-d57d-4d21-88a9-72899fdef6ce",
+    "name": "Digital Health System",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "End-to-end API collection for Digital Health Record and ML-Based Disease Surveillance."
+  },
+  "item": [
+    {
+      "name": "0. Health Checks",
+      "item": [
+        {
+          "name": "Backend Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ML Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mlBaseUrl}}/health",
+              "host": [
+                "{{mlBaseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Auth Logins",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('adminToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@health.local\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Receptionist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('receptionToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"reception@health.local\",\n  \"password\": \"Reception@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Nurse",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('nurseToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nurse@health.local\",\n  \"password\": \"Nurse@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Lab Technician",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('labToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"lab@health.local\",\n  \"password\": \"Lab@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Doctor",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('doctorToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"doctor@health.local\",\n  \"password\": \"Doctor@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login DMO",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.token) pm.collectionVariables.set('dmoToken', data.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dmo@health.local\",\n  \"password\": \"Dmo@123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Clinical Workflow",
+      "item": [
+        {
+          "name": "Create Patient (Receptionist)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.patient && data.patient._id) pm.collectionVariables.set('patientId', data.patient._id);",
+                  "if (data.patient && data.patient.patientCode) pm.collectionVariables.set('patientCode', data.patient.patientCode);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{receptionToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Ravi Kumar\",\n  \"age\": 34,\n  \"gender\": \"male\",\n  \"district\": \"Hyderabad\",\n  \"area\": \"Area A\",\n  \"addressLine\": \"H No 10-2-55, Main Road\",\n  \"contactNumber\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clinical/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clinical",
+                "patients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Medical Record (Nurse)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const data = pm.response.json();",
+                  "if (data.medicalRecord && data.medicalRecord._id) pm.collectionVariables.set('recordId', data.medicalRecord._id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{nurseToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appointmentAt\": \"2026-02-21T10:30:00.000Z\",\n  \"symptoms\": [\"fever\", \"body_pain\", \"headache\"],\n  \"vitals\": {\n    \"temperature\": 101.2,\n    \"bpSystolic\": 130,\n    \"bpDiastolic\": 86,\n    \"pulse\": 98,\n    \"spo2\": 96\n  },\n  \"nurseNotes\": \"Patient has high fever for 2 days.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clinical/patients/{{patientId}}/records",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clinical",
+                "patients",
+                "{{patientId}}",
+                "records"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Lab Report (Lab)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"testName\": \"CBC\",\n  \"values\": {\n    \"platelet_count\": 90000,\n    \"wbc\": \"high\",\n    \"crp\": \"positive\"\n  },\n  \"summary\": \"Platelets reduced, inflammatory markers elevated.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clinical/records/{{recordId}}/lab-reports",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clinical",
+                "records",
+                "{{recordId}}",
+                "lab-reports"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Doctor Diagnosis + Prescription + ML Prediction",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diseaseName\": \"Dengue\",\n  \"diagnosisNotes\": \"Confirmed based on symptoms and platelet trend.\",\n  \"doctorSeverity\": \"moderate\",\n  \"prescription\": {\n    \"medicines\": [\n      {\n        \"medicineName\": \"Paracetamol\",\n        \"dosage\": \"650mg\",\n        \"frequency\": \"TID\",\n        \"durationDays\": 5,\n        \"instructions\": \"After food\"\n      }\n    ],\n    \"generalAdvice\": \"Hydration and rest\",\n    \"followUpDate\": \"2026-02-24T10:30:00.000Z\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clinical/records/{{recordId}}/diagnosis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clinical",
+                "records",
+                "{{recordId}}",
+                "diagnosis"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patient History by Patient Code (Doctor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clinical/patients/by-code/{{patientCode}}/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clinical",
+                "patients",
+                "by-code",
+                "{{patientCode}}",
+                "history"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. DMO Analytics",
+      "item": [
+        {
+          "name": "Disease Burden (DMO)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{dmoToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/dmo/disease-burden?district={{district}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "analytics",
+                "dmo",
+                "disease-burden"
+              ],
+              "query": [
+                {
+                  "key": "district",
+                  "value": "{{district}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DMO Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{dmoToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analytics/dmo/overview?district={{district}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "analytics",
+                "dmo",
+                "overview"
+              ],
+              "query": [
+                {
+                  "key": "district",
+                  "value": "{{district}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "mlBaseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "district",
+      "value": "Hyderabad"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "receptionToken",
+      "value": ""
+    },
+    {
+      "key": "nurseToken",
+      "value": ""
+    },
+    {
+      "key": "labToken",
+      "value": ""
+    },
+    {
+      "key": "doctorToken",
+      "value": ""
+    },
+    {
+      "key": "dmoToken",
+      "value": ""
+    },
+    {
+      "key": "patientId",
+      "value": ""
+    },
+    {
+      "key": "patientCode",
+      "value": ""
+    },
+    {
+      "key": "recordId",
+      "value": ""
+    }
+  ]
+}
