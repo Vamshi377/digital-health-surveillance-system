@@ -1,19 +1,15 @@
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 const env = require("../config/env");
 const { connectDatabase } = require("../config/database");
 const { User } = require("../models/User");
 const { Patient } = require("../models/Patient");
 const { Prediction } = require("../models/Prediction");
 
-const TELANGANA_AREAS = [
-  { district: "Hyderabad", area: "Ameerpet", lat: 17.4375, lng: 78.4482 },
-  { district: "Hyderabad", area: "LB Nagar", lat: 17.3457, lng: 78.5522 },
-  { district: "Warangal", area: "Hanamkonda", lat: 18.0011, lng: 79.5788 },
-  { district: "Karimnagar", area: "Mankammathota", lat: 18.4337, lng: 79.1328 },
-  { district: "Jagtial", area: "Jagtial Town", lat: 18.7951, lng: 78.9172 },
-  { district: "Nizamabad", area: "Arsapally", lat: 18.6725, lng: 78.0941 },
-  { district: "Khammam", area: "Wyra Road", lat: 17.2473, lng: 80.1514 },
-  { district: "Nalgonda", area: "Marriguda", lat: 17.0541, lng: 79.2674 }
+const DEFAULT_AREAS = [
+  { district: "Hyderabad", area: "Hyderabad", lat: 17.4375, lng: 78.4482 },
+  { district: "Nizamabad", area: "Nizamabad", lat: 18.6725, lng: 78.0941 }
 ];
 
 const DISEASES = ["Dengue", "Malaria", "Typhoid", "Chikungunya", "Viral Fever"];
@@ -27,6 +23,39 @@ function rand(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function getFirstCoordinate(geometry) {
+  if (!geometry || !geometry.coordinates) return null;
+  if (geometry.type === "Polygon") return geometry.coordinates?.[0]?.[0] || null;
+  if (geometry.type === "MultiPolygon") return geometry.coordinates?.[0]?.[0]?.[0] || null;
+  return null;
+}
+
+function loadTelanganaAreas() {
+  const geoPath = path.resolve(__dirname, "..", "..", "frontend", "public", "data", "telanganaDistricts.json");
+  if (!fs.existsSync(geoPath)) {
+    return DEFAULT_AREAS;
+  }
+
+  const geo = JSON.parse(fs.readFileSync(geoPath, "utf-8"));
+  const features = Array.isArray(geo?.features) ? geo.features : [];
+  if (!features.length) {
+    return DEFAULT_AREAS;
+  }
+
+  return features.map((feature) => {
+    const props = feature.properties || {};
+    const district =
+      props.D_NAME || props.D_N || props.district || props.DISTRICT || props.dist_name || props.name || "Unknown";
+    const point = getFirstCoordinate(feature.geometry) || [78.5, 17.8];
+    return {
+      district: String(district).trim(),
+      area: String(district).trim(),
+      lat: Number(point[1]),
+      lng: Number(point[0])
+    };
+  });
+}
+
 async function run() {
   await connectDatabase();
 
@@ -38,9 +67,10 @@ async function run() {
     throw new Error("Admin user not found. Run npm run seed first.");
   }
 
+  const telanganaAreas = loadTelanganaAreas();
   const patients = [];
-  for (let i = 0; i < 120; i += 1) {
-    const place = pick(TELANGANA_AREAS);
+  for (let i = 0; i < 240; i += 1) {
+    const place = pick(telanganaAreas);
     patients.push({
       fullName: `DMO Demo Patient ${i + 1}`,
       age: rand(5, 78),

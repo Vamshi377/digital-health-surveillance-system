@@ -120,6 +120,8 @@ npm run seed
 ```bash
 npm run seed:dmo-mock
 ```
+This script now seeds patients/predictions across all Telangana districts from:
+`frontend/public/data/telanganaDistricts.json`
 
 ## Key API Endpoints
 ### Auth
@@ -172,3 +174,6 @@ If replacing map data, keep GeoJSON district property as one of:
 - `MedicalRecord` is one-per-appointment (prevents duplicate nursing records).
 - Lab reports store abnormal markers and critical flags.
 - DMO view supports both live DB mode and demo mode.
+- If only one district shows data in Live mode, reseed demo analytics:
+  1. `npm run seed:dmo-mock`
+  2. refresh DMO dashboard

@@ -295,7 +295,7 @@ function buildMockCluster(row) {
 }
 
 export default function DMOPage() {
-  const [district, setDistrict] = useState("Telangana");
+  const [district, setDistrict] = useState("");
   const [area, setArea] = useState("");
   const [timeRange, setTimeRange] = useState("7d");
   const [customFrom, setCustomFrom] = useState("");
