@@ -43,3 +43,4 @@ data/*.db
 Thumbs.db
 .idea/
 .vscode/
+temp/

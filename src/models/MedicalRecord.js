@@ -10,6 +10,13 @@ const medicalRecordSchema = new Schema(
       required: true,
       index: true
     },
+    appointment: {
+      type: Schema.Types.ObjectId,
+      ref: "Appointment",
+      required: true,
+      unique: true,
+      index: true
+    },
     appointmentAt: {
       type: Date,
       required: true,
@@ -42,6 +49,12 @@ const medicalRecordSchema = new Schema(
       enum: ["scheduled", "in_review", "diagnosed"],
       default: "in_review",
       index: true
+    },
+    vitalsAlertLevel: {
+      type: String,
+      enum: ["normal", "abnormal", "critical"],
+      default: "normal",
+      index: true
     }
   },
   {
@@ -51,6 +64,7 @@ const medicalRecordSchema = new Schema(
 );
 
 medicalRecordSchema.index({ patient: 1, createdAt: -1 });
+medicalRecordSchema.index({ appointment: 1 }, { unique: true });
 
 const MedicalRecord = mongoose.model("MedicalRecord", medicalRecordSchema);
 

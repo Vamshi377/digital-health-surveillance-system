@@ -31,6 +31,30 @@ const labReportSchema = new Schema(
       trim: true,
       default: ""
     },
+    reportImageUrl: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    reportOriginalName: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    reportMimeType: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    abnormalMarkers: {
+      type: [String],
+      default: []
+    },
+    isCritical: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
     uploadedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",

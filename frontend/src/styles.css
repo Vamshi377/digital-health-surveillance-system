@@ -139,6 +139,12 @@ body {
   gap: 10px;
 }
 
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
 input,
 select,
 button {
@@ -211,6 +217,62 @@ td {
   font-size: 24px;
 }
 
+.stat-card small {
+  display: block;
+  color: var(--text-soft);
+  margin-top: 6px;
+}
+
+.alert-card {
+  background: linear-gradient(145deg, #ffefef 0%, #ffd6d6 100%);
+  border-color: #f6aaaa;
+}
+
+.alert-card strong,
+.alert-card span,
+.alert-card small {
+  color: #8f1f1f;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.badge-up {
+  background: #ffe2e0;
+  color: #9b2418;
+}
+
+.badge-down {
+  background: #e4f6ea;
+  color: #13673f;
+}
+
+.badge-flat {
+  background: #eef1f5;
+  color: #465060;
+}
+
+.badge-trend-up {
+  background: linear-gradient(145deg, #ffe8e8 0%, #ffd5d5 100%);
+  border-color: #f3a8a8;
+}
+
+.badge-trend-down {
+  background: linear-gradient(145deg, #e8f8ef 0%, #d9f3e4 100%);
+  border-color: #a9ddbe;
+}
+
+.badge-trend-flat {
+  background: linear-gradient(145deg, #f4f6f8 0%, #eaedf1 100%);
+  border-color: #cfd6df;
+}
+
 .inline {
   display: flex;
   gap: 10px;
@@ -220,6 +282,84 @@ td {
 .chart-box {
   width: 100%;
   height: 320px;
+}
+
+.map-wrap {
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.critical-text {
+  color: #b6251a;
+  font-weight: 700;
+}
+
+pre {
+  background: #f6f9fc;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 20, 34, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(1100px, 96vw);
+  max-height: 85vh;
+  overflow: auto;
+  border-radius: 14px;
+  border: 1px solid var(--stroke);
+  background: #fff;
+  padding: 18px;
+  box-shadow: 0 22px 55px rgba(11, 24, 41, 0.3);
+}
+
+.live-status {
+  margin-top: 10px;
+}
+
+.alert-feed {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.feed-item {
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fbff;
+}
+
+.feed-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.feed-item p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.feed-high {
+  border-color: #f0a6a1;
+  background: #fff0ef;
+}
+
+.feed-moderate {
+  border-color: #f0d690;
+  background: #fff9ea;
 }
 
 .error {
@@ -278,6 +418,65 @@ td {
   color: var(--text-soft);
 }
 
+.dmo-console {
+  color: #14213d;
+}
+
+.dmo-hero {
+  background: linear-gradient(130deg, #0f3d7a 0%, #1f5bbf 50%, #3a78d9 100%);
+  color: #fff;
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 16px 38px rgba(15, 61, 122, 0.35);
+}
+
+.dmo-hero h2 {
+  margin: 0 0 8px;
+  font-size: 26px;
+}
+
+.dmo-hero p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.dmo-hero-badge {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dmo-panel {
+  background: linear-gradient(145deg, #ffffff 0%, #f6f9ff 100%);
+  border-color: #cedaf0;
+  box-shadow: 0 10px 26px rgba(15, 61, 122, 0.09);
+}
+
+.dmo-console table th {
+  background: #edf3ff;
+  color: #1f3a6f;
+  font-weight: 700;
+  border-bottom: 1px solid #cfdaf1;
+}
+
+.chart-3d {
+  filter: drop-shadow(0 8px 10px rgba(23, 42, 76, 0.22));
+}
+
+.map-card .map-wrap {
+  box-shadow: inset 0 0 0 1px #d4e0f4;
+}
+
+.telangana-only-map {
+  background: linear-gradient(180deg, #edf3ff 0%, #dde9ff 100%);
+}
+
 @media (max-width: 980px) {
   .body-grid {
     grid-template-columns: 1fr;
@@ -291,6 +490,7 @@ td {
   }
 
   .grid-2,
+  .grid-3,
   .stats-grid {
     grid-template-columns: 1fr;
   }

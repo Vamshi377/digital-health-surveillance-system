@@ -1,4 +1,8 @@
-const { getDmoDiseaseBurden, getDmoOverview } = require("../services/analyticsService");
+const {
+  getDmoDiseaseBurden,
+  getDmoOverviewWithAudit,
+  getDmoPatientCluster
+} = require("../services/analyticsService");
 
 async function dmoDiseaseBurdenHandler(req, res, next) {
   try {
@@ -17,12 +21,13 @@ async function dmoDiseaseBurdenHandler(req, res, next) {
 
 async function dmoOverviewHandler(req, res, next) {
   try {
-    const data = await getDmoOverview({
+    const filters = {
       district: req.query.district,
       area: req.query.area,
       fromDate: req.query.fromDate,
       toDate: req.query.toDate
-    });
+    };
+    const data = await getDmoOverviewWithAudit(filters, req.user?.id);
 
     return res.status(200).json(data);
   } catch (error) {
@@ -30,4 +35,24 @@ async function dmoOverviewHandler(req, res, next) {
   }
 }
 
-module.exports = { dmoDiseaseBurdenHandler, dmoOverviewHandler };
+async function dmoPatientClusterHandler(req, res, next) {
+  try {
+    const data = await getDmoPatientCluster(
+      {
+        district: req.query.district,
+        area: req.query.area,
+        disease: req.query.disease,
+        fromDate: req.query.fromDate,
+        toDate: req.query.toDate,
+        limit: req.query.limit
+      },
+      req.user?.id
+    );
+
+    return res.status(200).json(data);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = { dmoDiseaseBurdenHandler, dmoOverviewHandler, dmoPatientClusterHandler };

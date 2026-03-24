@@ -19,6 +19,10 @@ const patientSchema = new Schema(
       minlength: 2,
       maxlength: 120
     },
+    dateOfBirth: {
+      type: Date,
+      default: null
+    },
     age: {
       type: Number,
       required: true,
@@ -52,7 +56,12 @@ const patientSchema = new Schema(
       type: String,
       trim: true,
       maxlength: 20,
-      default: null
+      default: null,
+      index: true
+    },
+    location: {
+      lat: { type: Number, min: -90, max: 90, default: null },
+      lng: { type: Number, min: -180, max: 180, default: null }
     },
     registeredBy: {
       type: Schema.Types.ObjectId,
@@ -68,6 +77,10 @@ const patientSchema = new Schema(
 );
 
 patientSchema.index({ district: 1, area: 1, createdAt: -1 });
+patientSchema.index(
+  { contactNumber: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { contactNumber: { $type: "string" } } }
+);
 
 patientSchema.pre("validate", function setPatientCode(next) {
   if (!this.patientCode) {

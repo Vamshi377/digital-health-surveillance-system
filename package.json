@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node src/scripts/seedDemoData.js"
+    "seed": "node src/scripts/seedDemoData.js",
+    "seed:dmo-mock": "node src/scripts/seedDmoMockData.js"
   },
   "keywords": [
     "healthcare",
@@ -22,6 +23,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
     "mongoose": "^8.11.0"
   },
   "devDependencies": {
