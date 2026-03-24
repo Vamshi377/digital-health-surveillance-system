@@ -319,6 +319,7 @@ export default function DMOPage() {
     weeklyComparison: { totals: { current: 0, previous: 0, deltaPct: 0, trend: "stable" }, diseases: [] }
   });
   const [clusterModal, setClusterModal] = useState({ open: false, title: "", patients: [] });
+  const [selectedDistrictSummary, setSelectedDistrictSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState("");
   const [error, setError] = useState("");
@@ -488,18 +489,6 @@ export default function DMOPage() {
   const highSeverityRate = totalCases > 0 ? Number(((highSeverityCount / totalCases) * 100).toFixed(2)) : 0;
   const pressureScore = Number((highSeverityRate * 1.5 + outbreakAlertCount * 10).toFixed(2));
 
-  const liveFeed = useMemo(() => {
-    return districtBurdenList
-      .filter((item) => item.highSeverityPercent > 15 || item.cases > 5)
-      .slice(0, 12)
-      .map((item) => ({
-        type: "district-alert",
-        title: `${item.district} surveillance alert`,
-        detail: `cases: ${item.cases} | low: ${item.severity.low} | moderate: ${item.severity.moderate} | high: ${item.severity.high} | high%: ${item.highSeverityPercent}`,
-        severity: item.priority === "Urgent" ? "high" : "moderate"
-      }));
-  }, [districtBurdenList]);
-
   const districtCaseMap = useMemo(() => {
     return data.reduce((acc, row) => {
       const key = normalizeDistrictName(row.district);
@@ -548,6 +537,18 @@ export default function DMOPage() {
       .sort((a, b) => b.cases - a.cases);
   }, [telanganaDistrictsGeo, districtMetaMap, districtCaseMap, districtSeverityMap]);
 
+  const liveFeed = useMemo(() => {
+    return districtBurdenList
+      .filter((item) => item.highSeverityPercent > 15 || item.cases > 5)
+      .slice(0, 12)
+      .map((item) => ({
+        type: "district-alert",
+        title: `${item.district} surveillance alert`,
+        detail: `cases: ${item.cases} | low: ${item.severity.low} | moderate: ${item.severity.moderate} | high: ${item.severity.high} | high%: ${item.highSeverityPercent}`,
+        severity: item.priority === "Urgent" ? "high" : "moderate"
+      }));
+  }, [districtBurdenList]);
+
   const districtStyle = useCallback(
     (feature) => {
       const districtName = extractFeatureDistrictName(feature);
@@ -588,6 +589,16 @@ export default function DMOPage() {
         </div>`
       );
       layer.bindTooltip(`${districtName}: ${count} cases | ${priority}`, { sticky: true });
+      layer.on("click", () => {
+        setSelectedDistrictSummary({
+          district: districtName,
+          total: count,
+          low: severity.low,
+          moderate: severity.moderate,
+          high: severity.high,
+          priority
+        });
+      });
     },
     [districtCaseMap, districtSeverityMap, districtMetaMap]
   );
@@ -820,9 +831,25 @@ export default function DMOPage() {
         </div>
         {(!Array.isArray(telanganaDistrictsGeo?.features) || telanganaDistrictsGeo.features.length === 0) ? (
           <p className="hint">
-            District layer placeholder is empty. Replace data in `frontend/src/data/telanganaDistrictsGeo.js` with real Telangana district boundaries.
+            District layer placeholder is empty. Add district GeoJSON to `frontend/public/data/telanganaDistricts.json`.
           </p>
         ) : null}
+
+        <div className="district-summary">
+          <h4>Selected District Summary</h4>
+          {selectedDistrictSummary ? (
+            <div className="district-summary-grid">
+              <span>{selectedDistrictSummary.district}</span>
+              <span>Total: {selectedDistrictSummary.total}</span>
+              <span>Low: {selectedDistrictSummary.low}</span>
+              <span>Moderate: {selectedDistrictSummary.moderate}</span>
+              <span>High: {selectedDistrictSummary.high}</span>
+              <span>Priority: {selectedDistrictSummary.priority}</span>
+            </div>
+          ) : (
+            <p className="hint">Click any district on map to view Total, Low, Moderate, High and Priority.</p>
+          )}
+        </div>
       </div>
 
       <div className="card dmo-panel">
