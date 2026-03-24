@@ -153,10 +153,11 @@ npm run seed:dmo-mock
 - Hotspot ranking
 - District burden table
 - Telangana district choropleth (33 districts)
-- District click popup: total + low/moderate/high + priority
+- District hover tooltip and click popup: Active + low/moderate/high + priority
 - District click summary panel below map (updates on each district click)
 - Patient cluster modal for field action
 - No circle/radius overlays; district-boundary mapping only
+- Telangana-themed map background for readability behind district polygons
 
 ## Telangana District Map Data
 Runtime files used by frontend:

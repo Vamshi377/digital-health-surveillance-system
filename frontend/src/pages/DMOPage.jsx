@@ -15,24 +15,11 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { GeoJSON, MapContainer, Polygon } from "react-leaflet";
+import { GeoJSON, MapContainer } from "react-leaflet";
 import api from "../services/api";
 import StatCard from "../components/StatCard";
 
 const TELANGANA_CENTER = [17.95, 79.2];
-const TELANGANA_OUTLINE = [
-  [19.85, 77.5],
-  [19.82, 79.7],
-  [19.25, 80.75],
-  [17.95, 80.95],
-  [16.75, 80.75],
-  [15.9, 79.95],
-  [15.85, 78.35],
-  [16.45, 77.55],
-  [17.7, 77.1],
-  [18.95, 77.1]
-];
-
 const BASE_DEMO_ROWS = [
   { district: "Hyderabad", area: "Hyderabad", disease: "Dengue", totalAffected: 14, lat: 17.4375, lng: 78.4482, severity: { low: 4, moderate: 5, high: 5 } },
   { district: "Warangal Urban", area: "Warangal Urban", disease: "Typhoid", totalAffected: 9, lat: 18.0011, lng: 79.5788, severity: { low: 3, moderate: 4, high: 2 } },
@@ -57,6 +44,18 @@ function normalizeDistrictName(value) {
     .replace(/[^a-z]/g, "")
     .trim();
   return DISTRICT_ALIASES[normalized] || normalized;
+}
+
+function resolveDistrictKey(name, availableKeys) {
+  const normalized = normalizeDistrictName(name);
+  if (availableKeys.includes(normalized)) {
+    return normalized;
+  }
+
+  const contained = availableKeys.find(
+    (key) => key.includes(normalized) || normalized.includes(key)
+  );
+  return contained || normalized;
 }
 
 function extractFeatureDistrictName(feature) {
@@ -496,6 +495,7 @@ export default function DMOPage() {
       return acc;
     }, {});
   }, [data]);
+  const districtCaseKeys = useMemo(() => Object.keys(districtCaseMap), [districtCaseMap]);
 
   const districtSeverityMap = useMemo(() => {
     return data.reduce((acc, row) => {
@@ -519,9 +519,10 @@ export default function DMOPage() {
     return uniqueDistricts
       .map((name) => {
         const normalized = normalizeDistrictName(name);
+        const resolvedKey = resolveDistrictKey(normalized, districtCaseKeys);
         const meta = districtMetaMap[normalized];
-        const severity = districtSeverityMap[normalized] || { low: 0, moderate: 0, high: 0 };
-        const cases = districtCaseMap[normalized] || 0;
+        const severity = districtSeverityMap[resolvedKey] || { low: 0, moderate: 0, high: 0 };
+        const cases = districtCaseMap[resolvedKey] || 0;
         const highSeverityPercent = cases > 0 ? Number(((severity.high / cases) * 100).toFixed(2)) : 0;
         const priority = getPriority(cases, highSeverityPercent);
         return {
@@ -535,7 +536,7 @@ export default function DMOPage() {
         };
       })
       .sort((a, b) => b.cases - a.cases);
-  }, [telanganaDistrictsGeo, districtMetaMap, districtCaseMap, districtSeverityMap]);
+  }, [telanganaDistrictsGeo, districtMetaMap, districtCaseMap, districtSeverityMap, districtCaseKeys]);
 
   const liveFeed = useMemo(() => {
     return districtBurdenList
@@ -552,7 +553,8 @@ export default function DMOPage() {
   const districtStyle = useCallback(
     (feature) => {
       const districtName = extractFeatureDistrictName(feature);
-      const count = districtCaseMap[normalizeDistrictName(districtName)] || 0;
+      const resolvedKey = resolveDistrictKey(districtName, districtCaseKeys);
+      const count = districtCaseMap[resolvedKey] || 0;
       return {
         color: "#23395d",
         weight: 1.2,
@@ -560,15 +562,15 @@ export default function DMOPage() {
         fillOpacity: count > 0 ? 0.42 : 0.1
       };
     },
-    [districtCaseMap]
+    [districtCaseMap, districtCaseKeys]
   );
 
   const onEachDistrict = useCallback(
     (feature, layer) => {
       const districtName = extractFeatureDistrictName(feature) || "Unknown";
-      const normalized = normalizeDistrictName(districtName);
-      const count = districtCaseMap[normalized] || 0;
-      const severity = districtSeverityMap[normalized] || { low: 0, moderate: 0, high: 0 };
+      const resolvedKey = resolveDistrictKey(districtName, districtCaseKeys);
+      const count = districtCaseMap[resolvedKey] || 0;
+      const severity = districtSeverityMap[resolvedKey] || { low: 0, moderate: 0, high: 0 };
       const highSeverityPercent = count > 0 ? Number(((severity.high / count) * 100).toFixed(2)) : 0;
       const priority = getPriority(count, highSeverityPercent);
       const meta = districtMetaMap[normalizeDistrictName(districtName)];
@@ -579,7 +581,7 @@ export default function DMOPage() {
       layer.bindPopup(
         `<div style="min-width:170px">
           <strong>${districtName}</strong><br/>
-          total: ${count}<br/>
+          Active cases: ${count}<br/>
           low: ${severity.low}<br/>
           moderate: ${severity.moderate}<br/>
           high: ${severity.high}<br/>
@@ -588,7 +590,17 @@ export default function DMOPage() {
           ${literacy.replace(" | ", "")}
         </div>`
       );
-      layer.bindTooltip(`${districtName}: ${count} cases | ${priority}`, { sticky: true });
+      layer.bindTooltip(
+        `<div style="min-width:170px">
+          <strong>${districtName}</strong><br/>
+          Active: ${count}<br/>
+          Low: ${severity.low}<br/>
+          Moderate: ${severity.moderate}<br/>
+          High: ${severity.high}<br/>
+          Priority: ${priority}
+        </div>`,
+        { sticky: true }
+      );
       layer.on("click", () => {
         setSelectedDistrictSummary({
           district: districtName,
@@ -600,7 +612,7 @@ export default function DMOPage() {
         });
       });
     },
-    [districtCaseMap, districtSeverityMap, districtMetaMap]
+    [districtCaseMap, districtSeverityMap, districtMetaMap, districtCaseKeys]
   );
 
   return (
@@ -823,10 +835,6 @@ export default function DMOPage() {
             {Array.isArray(telanganaDistrictsGeo?.features) && telanganaDistrictsGeo.features.length > 0 ? (
               <GeoJSON data={telanganaDistrictsGeo} style={districtStyle} onEachFeature={onEachDistrict} />
             ) : null}
-            <Polygon
-              positions={TELANGANA_OUTLINE}
-              pathOptions={{ color: "#1f3f7a", fillColor: "#5f8ccf", fillOpacity: 0.12, weight: 2 }}
-            />
           </MapContainer>
         </div>
         {(!Array.isArray(telanganaDistrictsGeo?.features) || telanganaDistrictsGeo.features.length === 0) ? (
