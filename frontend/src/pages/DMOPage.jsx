@@ -538,6 +538,11 @@ export default function DMOPage() {
       .sort((a, b) => b.cases - a.cases);
   }, [telanganaDistrictsGeo, districtMetaMap, districtCaseMap, districtSeverityMap, districtCaseKeys]);
 
+  const geoLayerKey = useMemo(
+    () => `geo-${JSON.stringify(districtCaseMap)}-${JSON.stringify(districtSeverityMap)}`,
+    [districtCaseMap, districtSeverityMap]
+  );
+
   const liveFeed = useMemo(() => {
     return districtBurdenList
       .filter((item) => item.highSeverityPercent > 15 || item.cases > 5)
@@ -833,7 +838,12 @@ export default function DMOPage() {
             zoomControl={false}
           >
             {Array.isArray(telanganaDistrictsGeo?.features) && telanganaDistrictsGeo.features.length > 0 ? (
-              <GeoJSON data={telanganaDistrictsGeo} style={districtStyle} onEachFeature={onEachDistrict} />
+              <GeoJSON
+                key={geoLayerKey}
+                data={telanganaDistrictsGeo}
+                style={districtStyle}
+                onEachFeature={onEachDistrict}
+              />
             ) : null}
           </MapContainer>
         </div>
