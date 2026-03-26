@@ -22,18 +22,20 @@ Full-stack hospital workflow platform with severity prediction and DMO district 
 7. DMO dashboard updates with district and severity analytics.
 
 ## Roles
-- `admin`
 - `receptionist`
 - `nurse`
 - `lab_technician`
 - `doctor`
-- `government_officer` (DMO)
+- `medical_superintendent`
+- `hospital_admin`
+- `dmo`
 - `patient`
 
 ## Security
 - bcrypt password hashing
 - JWT authentication
 - RBAC route guards
+- approval workflow with `PENDING`, `APPROVED`, `REJECTED`
 - schema/service validation
 - centralized error handling
 - audit logging (`AuditLog`) for key create/view actions
@@ -116,6 +118,35 @@ npm run dev
 npm run seed
 ```
 
+Important: the preset logins shown on the frontend login page work only after this seed step completes successfully.
+On a fresh clone, if MongoDB is not connected or `npm run seed` was not run, login will fail because demo users do not exist yet.
+
+Demo accounts created by `npm run seed`:
+- `hospitaladmin@health.local` / `HospitalAdmin@123`
+- `reception@health.local` / `Reception@123`
+- `nurse@health.local` / `Nurse@123`
+- `lab@health.local` / `Lab@123`
+- `doctor@health.local` / `Doctor@123`
+- `ms@health.local` / `Superintendent@123`
+- `dmo@health.local` / `Dmo@123`
+- `patient@health.local` / `Patient@123`
+
+## Authentication Workflow
+- Single login page with `email`, `password`, and `role`
+- Staff registration page with common and role-specific fields
+- New staff registrations default to `PENDING`
+- Users cannot log in unless `approvalStatus === APPROVED`
+- Pending or rejected users see: `Your account is under verification`
+
+## Approval Rules
+- `doctor` -> approved by `medical_superintendent`
+- `nurse` -> approved by `medical_superintendent`
+- `lab_technician` -> approved by `medical_superintendent`
+- `receptionist` -> approved by `hospital_admin`
+- `medical_superintendent` -> approved by `dmo`
+- `hospital_admin` -> approved by `dmo`
+- `dmo` can be pre-created by seed/system
+
 ### Extra DMO mock records for analytics demos
 ```bash
 npm run seed:dmo-mock
@@ -128,17 +159,18 @@ This script now seeds patients/predictions across all Telangana districts from:
 - `POST /api/auth/login`
 - `POST /api/auth/register`
 - `GET /api/auth/me`
+- `PATCH /api/admin/users/:userId/approval`
 
 ### Clinical
-- `GET /api/clinical/patients/search-by-phone?phone=...` (reception/admin)
-- `POST /api/clinical/patients` (reception/admin)
-- `POST /api/clinical/patients/:patientId/appointments` (reception/admin)
-- `GET /api/clinical/nurse/queue` (nurse/admin)
-- `POST /api/clinical/appointments/:appointmentId/records` (nurse/admin)
-- `POST /api/clinical/records/:recordId/lab-reports` (lab/admin, multipart `reportImage` optional)
-- `GET /api/clinical/doctor/dashboard` (doctor/admin)
-- `GET /api/clinical/records/:recordId/summary` (doctor/admin)
-- `POST /api/clinical/records/:recordId/diagnosis` (doctor/admin)
+- `GET /api/clinical/patients/search-by-phone?phone=...` (reception/hospital_admin)
+- `POST /api/clinical/patients` (reception/hospital_admin)
+- `POST /api/clinical/patients/:patientId/appointments` (reception/hospital_admin)
+- `GET /api/clinical/nurse/queue` (nurse/hospital_admin)
+- `POST /api/clinical/appointments/:appointmentId/records` (nurse/hospital_admin)
+- `POST /api/clinical/records/:recordId/lab-reports` (lab/hospital_admin, multipart `reportImage` optional)
+- `GET /api/clinical/doctor/dashboard` (doctor/hospital_admin)
+- `GET /api/clinical/records/:recordId/summary` (doctor/hospital_admin)
+- `POST /api/clinical/records/:recordId/diagnosis` (doctor/hospital_admin)
 - `GET /api/clinical/patients/:patientId/history`
 - `GET /api/clinical/patients/by-code/:patientCode/history`
 - `GET /api/clinical/patient/me/history` (patient)
@@ -177,3 +209,18 @@ If replacing map data, keep GeoJSON district property as one of:
 - If only one district shows data in Live mode, reseed demo analytics:
   1. `npm run seed:dmo-mock`
   2. refresh DMO dashboard
+
+## Login Troubleshooting For Fresh Clones
+1. Create the root `.env` with a valid `MONGO_URI`.
+2. Start MongoDB or use MongoDB Atlas.
+3. Run `npm install` in the root and `npm install` inside `frontend`.
+4. Run `npm run seed` in the project root.
+5. Start backend with `npm run dev`.
+6. Start ML service if you want prediction flow.
+7. Start frontend with `cd frontend` and `npm run dev`.
+8. Open `http://localhost:5173` and use one of the demo accounts above.
+
+If login still fails:
+- Check backend health at `http://localhost:4000/health`.
+- Check that the backend is using the same MongoDB database you seeded.
+- Check backend terminal logs for `Invalid credentials`, `Your account is under verification`, Mongo connection errors, or JWT/env errors.

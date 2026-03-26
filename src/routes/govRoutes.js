@@ -5,7 +5,7 @@ const { authorize } = require("../middleware/rbac");
 
 const router = express.Router();
 
-router.use(authenticate, authorize("government_officer", "admin"));
+router.use(authenticate, authorize("dmo", "hospital_admin"));
 
 router.get("/trends", (req, res) => {
   const rows = db

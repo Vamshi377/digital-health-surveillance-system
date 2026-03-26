@@ -2,7 +2,8 @@ const {
   createUserByAdmin,
   updateUserRole,
   updateUserStatus,
-  listUsers
+  listUsers,
+  reviewUserApproval
 } = require("../services/adminService");
 
 async function createUserHandler(req, res, next) {
@@ -34,8 +35,17 @@ async function updateUserStatusHandler(req, res, next) {
 
 async function listUsersHandler(req, res, next) {
   try {
-    const users = await listUsers();
+    const users = await listUsers(req.query);
     return res.status(200).json({ users });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function reviewUserApprovalHandler(req, res, next) {
+  try {
+    const user = await reviewUserApproval(req.params.userId, req.body, req.user);
+    return res.status(200).json({ user });
   } catch (error) {
     return next(error);
   }
@@ -45,5 +55,6 @@ module.exports = {
   createUserHandler,
   updateUserRoleHandler,
   updateUserStatusHandler,
-  listUsersHandler
+  listUsersHandler,
+  reviewUserApprovalHandler
 };

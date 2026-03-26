@@ -80,7 +80,7 @@ router.post("/patients/:id/vitals", authorize("nurse"), (req, res) => {
 
 router.get(
   "/patients/:id",
-  authorize("doctor", "nurse", "lab_technician", "receptionist", "admin"),
+  authorize("doctor", "nurse", "lab_technician", "receptionist", "hospital_admin"),
   (req, res) => {
     const record = getPatientRecord(req.params.id);
     if (!record) {

@@ -12,21 +12,21 @@ const router = express.Router();
 router.get(
   "/dmo/disease-burden",
   authenticate,
-  authorize("government_officer", "admin"),
+  authorize("dmo", "hospital_admin"),
   dmoDiseaseBurdenHandler
 );
 
 router.get(
   "/dmo/overview",
   authenticate,
-  authorize("government_officer", "admin"),
+  authorize("dmo", "hospital_admin"),
   dmoOverviewHandler
 );
 
 router.get(
   "/dmo/patient-cluster",
   authenticate,
-  authorize("government_officer", "admin"),
+  authorize("dmo", "hospital_admin"),
   dmoPatientClusterHandler
 );
 

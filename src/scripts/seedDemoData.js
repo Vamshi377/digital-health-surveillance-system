@@ -16,7 +16,8 @@ async function upsertUser({ fullName, email, password, role, patientId = null })
           passwordHash,
           role,
           isActive: true,
-          patientId
+          patientId,
+          approvalStatus: "APPROVED"
         }
       }
     );
@@ -29,7 +30,8 @@ async function upsertUser({ fullName, email, password, role, patientId = null })
     passwordHash,
     role,
     isActive: true,
-    patientId
+    patientId,
+    approvalStatus: "APPROVED"
   });
 }
 
@@ -37,12 +39,12 @@ async function seed() {
   await connectDatabase();
 
   await upsertUser({
-    fullName: "System Admin",
-    email: "admin@health.local",
-    password: "Admin@123",
-    role: "admin"
+    fullName: "Sunitha Rao",
+    email: "hospitaladmin@health.local",
+    password: "HospitalAdmin@123",
+    role: "hospital_admin"
   });
-  const admin = await User.findOne({ email: "admin@health.local" }).lean();
+  const admin = await User.findOne({ email: "hospitaladmin@health.local" }).lean();
   if (!admin) {
     throw new Error("Admin seed failed");
   }
@@ -82,6 +84,12 @@ async function seed() {
     role: "doctor"
   });
   await upsertUser({
+    fullName: "Medical Superintendent",
+    email: "ms@health.local",
+    password: "Superintendent@123",
+    role: "medical_superintendent"
+  });
+  await upsertUser({
     fullName: "Lab Technician One",
     email: "lab@health.local",
     password: "Lab@123",
@@ -91,7 +99,7 @@ async function seed() {
     fullName: "District Medical Officer",
     email: "dmo@health.local",
     password: "Dmo@123",
-    role: "government_officer"
+    role: "dmo"
   });
   await upsertUser({
     fullName: "Demo Patient User",

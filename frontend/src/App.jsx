@@ -1,13 +1,14 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminPage from "./pages/AdminPage";
+import ApprovalPage from "./pages/ApprovalPage";
 import DMOPage from "./pages/DMOPage";
 import DoctorPage from "./pages/DoctorPage";
 import LabPage from "./pages/LabPage";
 import LoginPage from "./pages/LoginPage";
 import NursePage from "./pages/NursePage";
 import PatientPage from "./pages/PatientPage";
+import RegisterPage from "./pages/RegisterPage";
 import ReceptionPage from "./pages/ReceptionPage";
 import RoleHome from "./pages/RoleHome";
 import { useAuth } from "./state/AuthContext";
@@ -20,15 +21,15 @@ function PrivateApp() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute roles={["admin"]}>
-              <AdminPage />
+            <ProtectedRoute roles={["hospital_admin"]}>
+              <ApprovalPage />
             </ProtectedRoute>
           }
         />
         <Route
           path="/reception"
           element={
-            <ProtectedRoute roles={["receptionist", "admin"]}>
+            <ProtectedRoute roles={["receptionist", "hospital_admin"]}>
               <ReceptionPage />
             </ProtectedRoute>
           }
@@ -36,7 +37,7 @@ function PrivateApp() {
         <Route
           path="/nurse"
           element={
-            <ProtectedRoute roles={["nurse", "admin"]}>
+            <ProtectedRoute roles={["nurse", "hospital_admin"]}>
               <NursePage />
             </ProtectedRoute>
           }
@@ -44,7 +45,7 @@ function PrivateApp() {
         <Route
           path="/lab"
           element={
-            <ProtectedRoute roles={["lab_technician", "admin"]}>
+            <ProtectedRoute roles={["lab_technician", "hospital_admin"]}>
               <LabPage />
             </ProtectedRoute>
           }
@@ -52,16 +53,32 @@ function PrivateApp() {
         <Route
           path="/doctor"
           element={
-            <ProtectedRoute roles={["doctor", "admin"]}>
+            <ProtectedRoute roles={["doctor", "hospital_admin"]}>
               <DoctorPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superintendent"
+          element={
+            <ProtectedRoute roles={["medical_superintendent"]}>
+              <ApprovalPage />
             </ProtectedRoute>
           }
         />
         <Route
           path="/dmo"
           element={
-            <ProtectedRoute roles={["government_officer", "admin"]}>
+            <ProtectedRoute roles={["dmo", "hospital_admin"]}>
               <DMOPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dmo/approvals"
+          element={
+            <ProtectedRoute roles={["dmo"]}>
+              <ApprovalPage />
             </ProtectedRoute>
           }
         />
@@ -86,6 +103,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );

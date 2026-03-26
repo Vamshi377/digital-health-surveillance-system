@@ -176,6 +176,33 @@ button.primary {
   box-shadow: 0 8px 20px rgba(15, 127, 87, 0.28);
 }
 
+.field-full {
+  grid-column: 1 / -1;
+}
+
+.inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-stack,
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-stack span {
+  font-size: 12px;
+}
+
+.inset-card {
+  background: #f7fafc;
+  margin-top: 16px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -256,6 +283,46 @@ td {
 .badge-flat {
   background: #eef1f5;
   color: #465060;
+}
+
+.login-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(560px, 100%);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 18px 50px rgba(17, 35, 56, 0.12);
+}
+
+.register-card {
+  width: min(820px, 100%);
+}
+
+.preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.hint {
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.success-text {
+  color: #13673f;
 }
 
 .badge-trend-up {

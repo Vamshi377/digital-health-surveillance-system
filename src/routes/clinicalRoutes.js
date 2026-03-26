@@ -21,29 +21,29 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/patients/search-by-phone", authorize("receptionist", "admin"), searchPatientByPhoneHandler);
-router.post("/patients", authorize("receptionist", "admin"), registerPatientHandler);
-router.post("/patients/:patientId/appointments", authorize("receptionist", "admin"), createAppointmentHandler);
-router.get("/nurse/queue", authorize("nurse", "admin"), nurseQueueHandler);
-router.post("/appointments/:appointmentId/records", authorize("nurse", "admin"), createMedicalRecordHandler);
+router.get("/patients/search-by-phone", authorize("receptionist", "hospital_admin"), searchPatientByPhoneHandler);
+router.post("/patients", authorize("receptionist", "hospital_admin"), registerPatientHandler);
+router.post("/patients/:patientId/appointments", authorize("receptionist", "hospital_admin"), createAppointmentHandler);
+router.get("/nurse/queue", authorize("nurse", "hospital_admin"), nurseQueueHandler);
+router.post("/appointments/:appointmentId/records", authorize("nurse", "hospital_admin"), createMedicalRecordHandler);
 router.post(
   "/records/:recordId/lab-reports",
-  authorize("lab_technician", "admin"),
+  authorize("lab_technician", "hospital_admin"),
   uploadLabReportImage.single("reportImage"),
   uploadLabReportHandler
 );
-router.post("/records/:recordId/diagnosis", authorize("doctor", "admin"), diagnosePatientHandler);
+router.post("/records/:recordId/diagnosis", authorize("doctor", "hospital_admin"), diagnosePatientHandler);
 
-router.get("/doctor/dashboard", authorize("doctor", "admin"), doctorDashboardHandler);
-router.get("/records/:recordId/summary", authorize("doctor", "admin"), recordSummaryHandler);
+router.get("/doctor/dashboard", authorize("doctor", "hospital_admin"), doctorDashboardHandler);
+router.get("/records/:recordId/summary", authorize("doctor", "hospital_admin"), recordSummaryHandler);
 router.get(
   "/patients/:patientId/history",
-  authorize("doctor", "nurse", "lab_technician", "government_officer", "admin"),
+  authorize("doctor", "nurse", "lab_technician", "dmo", "hospital_admin"),
   patientHistoryHandler
 );
 router.get(
   "/patients/by-code/:patientCode/history",
-  authorize("doctor", "nurse", "lab_technician", "government_officer", "admin"),
+  authorize("doctor", "nurse", "lab_technician", "dmo", "hospital_admin"),
   patientHistoryByCodeHandler
 );
 router.get("/patient/me/history", authorize("patient"), myRecordsHandler);

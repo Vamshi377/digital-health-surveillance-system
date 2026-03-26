@@ -2,12 +2,13 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext";
 
 const pathByRole = {
-  admin: "/admin",
+  hospital_admin: "/admin",
   receptionist: "/reception",
   nurse: "/nurse",
   lab_technician: "/lab",
   doctor: "/doctor",
-  government_officer: "/dmo",
+  medical_superintendent: "/superintendent",
+  dmo: "/dmo",
   patient: "/patient"
 };
 

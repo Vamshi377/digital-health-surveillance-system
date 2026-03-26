@@ -1,8 +1,9 @@
-const { User, USER_ROLES } = require("../models/User");
+const { User } = require("../models/User");
 const { Patient } = require("../models/Patient");
 const { createHttpError } = require("../utils/httpError");
+const { USER_ROLES, APPROVAL_STATUSES, normalizeRole, getRequiredApproverRole } = require("../utils/roles");
 
-const STAFF_ROLES = new Set(["admin", "receptionist", "nurse", "doctor", "lab_technician", "government_officer"]);
+const STAFF_ROLES = new Set(["hospital_admin", "receptionist", "nurse", "doctor", "lab_technician", "medical_superintendent", "dmo"]);
 
 async function createUserByAdmin(payload) {
   const { fullName, email, password, role, patientCode } = payload;
@@ -11,7 +12,7 @@ async function createUserByAdmin(payload) {
     throw createHttpError(400, "fullName, email, password, role are required");
   }
 
-  const normalizedRole = String(role).trim().toLowerCase();
+  const normalizedRole = normalizeRole(role);
   if (!USER_ROLES.includes(normalizedRole)) {
     throw createHttpError(400, "Invalid role");
   }
@@ -40,6 +41,7 @@ async function createUserByAdmin(payload) {
     email: normalizedEmail,
     passwordHash,
     role: normalizedRole,
+    approvalStatus: "APPROVED",
     patientId: linkedPatientId
   });
 
@@ -58,7 +60,7 @@ async function updateUserRole(userId, payload) {
     throw createHttpError(400, "role is required");
   }
 
-  const normalizedRole = String(role).trim().toLowerCase();
+  const normalizedRole = normalizeRole(role);
   if (!USER_ROLES.includes(normalizedRole)) {
     throw createHttpError(400, "Invalid role");
   }
@@ -99,13 +101,64 @@ async function updateUserStatus(userId, payload) {
   return user;
 }
 
-async function listUsers() {
-  return User.find({}, { passwordHash: 0 }).sort({ createdAt: -1 }).lean();
+async function listUsers(filters = {}) {
+  const query = {};
+  if (filters.role) {
+    query.role = normalizeRole(filters.role);
+  }
+  if (filters.approvalStatus) {
+    const normalizedStatus = String(filters.approvalStatus).toUpperCase().trim();
+    if (!APPROVAL_STATUSES.includes(normalizedStatus)) {
+      throw createHttpError(400, "Invalid approvalStatus");
+    }
+    query.approvalStatus = normalizedStatus;
+  }
+
+  return User.find(query, { passwordHash: 0 }).sort({ createdAt: -1 }).lean();
+}
+
+async function reviewUserApproval(userId, payload, actor) {
+  const target = await User.findById(userId);
+  if (!target) {
+    throw createHttpError(404, "User not found");
+  }
+
+  const nextStatus = String(payload.status || "").toUpperCase().trim();
+  if (!["APPROVED", "REJECTED"].includes(nextStatus)) {
+    throw createHttpError(400, "status must be APPROVED or REJECTED");
+  }
+
+  const actorRole = normalizeRole(actor?.role);
+  const requiredApproverRole = getRequiredApproverRole(target.role);
+  if (!requiredApproverRole) {
+    throw createHttpError(400, "This role does not require approval workflow");
+  }
+  if (actorRole !== requiredApproverRole) {
+    throw createHttpError(403, `Only ${requiredApproverRole} can review this registration`);
+  }
+
+  target.approvalStatus = nextStatus;
+  target.approvalRemarks = payload.remarks ? String(payload.remarks).trim() : "";
+  target.approvalReviewedAt = new Date();
+  target.approvalReviewedBy = actor.id;
+  await target.save();
+
+  return {
+    id: target._id,
+    fullName: target.fullName,
+    email: target.email,
+    role: target.role,
+    approvalStatus: target.approvalStatus,
+    approvalRemarks: target.approvalRemarks,
+    approvalReviewedAt: target.approvalReviewedAt,
+    approvalReviewedBy: target.approvalReviewedBy
+  };
 }
 
 module.exports = {
   createUserByAdmin,
   updateUserRole,
   updateUserStatus,
-  listUsers
+  listUsers,
+  reviewUserApproval
 };

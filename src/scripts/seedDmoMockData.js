@@ -60,11 +60,11 @@ async function run() {
   await connectDatabase();
 
   const admin =
-    (await User.findOne({ role: "admin" }).lean()) ||
-    (await User.findOne({ email: "admin@health.local" }).lean());
+    (await User.findOne({ role: "hospital_admin" }).lean()) ||
+    (await User.findOne({ email: "hospitaladmin@health.local" }).lean());
 
   if (!admin) {
-    throw new Error("Admin user not found. Run npm run seed first.");
+    throw new Error("Hospital admin user not found. Run npm run seed first.");
   }
 
   const telanganaAreas = loadTelanganaAreas();

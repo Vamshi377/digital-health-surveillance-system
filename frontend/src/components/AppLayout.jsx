@@ -2,12 +2,23 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext";
 
 const roleLinks = {
-  admin: [{ label: "Admin", to: "/admin" }],
+  hospital_admin: [
+    { label: "Approvals", to: "/admin" },
+    { label: "Reception", to: "/reception" },
+    { label: "Nurse", to: "/nurse" },
+    { label: "Lab", to: "/lab" },
+    { label: "Doctor", to: "/doctor" },
+    { label: "DMO Analytics", to: "/dmo" }
+  ],
   receptionist: [{ label: "Reception", to: "/reception" }],
   nurse: [{ label: "Nurse", to: "/nurse" }],
   lab_technician: [{ label: "Lab", to: "/lab" }],
   doctor: [{ label: "Doctor", to: "/doctor" }],
-  government_officer: [{ label: "DMO", to: "/dmo" }],
+  medical_superintendent: [{ label: "Approvals", to: "/superintendent" }],
+  dmo: [
+    { label: "DMO Analytics", to: "/dmo" },
+    { label: "Approvals", to: "/dmo/approvals" }
+  ],
   patient: [{ label: "My Records", to: "/patient" }]
 };
 
