@@ -8,6 +8,7 @@ async function dmoDiseaseBurdenHandler(req, res, next) {
   try {
     const data = await getDmoDiseaseBurden({
       district: req.query.district,
+      mandal: req.query.mandal,
       area: req.query.area,
       fromDate: req.query.fromDate,
       toDate: req.query.toDate
@@ -23,6 +24,7 @@ async function dmoOverviewHandler(req, res, next) {
   try {
     const filters = {
       district: req.query.district,
+      mandal: req.query.mandal,
       area: req.query.area,
       fromDate: req.query.fromDate,
       toDate: req.query.toDate
@@ -40,6 +42,7 @@ async function dmoPatientClusterHandler(req, res, next) {
     const data = await getDmoPatientCluster(
       {
         district: req.query.district,
+        mandal: req.query.mandal,
         area: req.query.area,
         disease: req.query.disease,
         fromDate: req.query.fromDate,

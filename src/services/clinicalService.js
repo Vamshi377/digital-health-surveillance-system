@@ -5,6 +5,7 @@ const { LabReport } = require("../models/LabReport");
 const { Diagnosis } = require("../models/Diagnosis");
 const { Prescription } = require("../models/Prescription");
 const { Prediction } = require("../models/Prediction");
+const { Notification } = require("../models/Notification");
 const { User } = require("../models/User");
 const { predictSeverity } = require("./mlService");
 const { createHttpError } = require("../utils/httpError");
@@ -104,20 +105,120 @@ function getAbnormalLabMarkers(testName, values) {
   return { markers, isCritical };
 }
 
-async function searchPatientByPhone(phone) {
-  if (!phone) {
-    throw createHttpError(400, "phone is required");
+function severityRank(value) {
+  switch (String(value || "").toLowerCase()) {
+    case "high":
+      return 3;
+    case "moderate":
+      return 2;
+    case "low":
+      return 1;
+    default:
+      return 0;
   }
-  const normalizedPhone = String(phone).trim();
-  const patient = await Patient.findOne({ contactNumber: normalizedPhone }).lean();
+}
+
+function buildRiskInsight(predictions) {
+  const history = Array.isArray(predictions) ? predictions : [];
+  if (!history.length) {
+    return {
+      latest: null,
+      previous: null,
+      trend: "no_history",
+      recommendation: "No earlier ML prediction is available for comparison."
+    };
+  }
+
+  const latest = history[0];
+  const previous = history[1] || null;
+
+  if (!previous) {
+    return {
+      latest,
+      previous: null,
+      trend: "baseline_only",
+      recommendation:
+        "Use this as the patient's baseline ML risk and compare it with symptoms, vitals, and the next visit."
+    };
+  }
+
+  const latestProbability = Number(latest.probability || 0);
+  const previousProbability = Number(previous.probability || 0);
+  const probabilityDelta = Number((latestProbability - previousProbability).toFixed(2));
+  const severityDelta = severityRank(latest.predictedSeverity) - severityRank(previous.predictedSeverity);
+
+  let trend = "stable";
+  if (severityDelta > 0 || probabilityDelta >= 0.1) {
+    trend = "rising";
+  } else if (severityDelta < 0 || probabilityDelta <= -0.1) {
+    trend = "falling";
+  }
+
+  let recommendation = "Risk trend is stable. Continue with clinical correlation and planned follow-up.";
+  if (trend === "rising") {
+    recommendation =
+      "Risk is higher than the previous visit. Doctor should reassess progression, labs, and whether escalation or admission is needed.";
+  } else if (trend === "falling") {
+    recommendation =
+      "Risk is lower than the previous visit. This can support recovery tracking, but treatment should still follow current clinical findings.";
+  }
+
+  return {
+    latest,
+    previous,
+    trend,
+    probabilityDelta,
+    severityDelta,
+    recommendation
+  };
+}
+
+async function searchPatient(phone, aadharNumber) {
+  const normalizedPhone = phone ? String(phone).trim() : "";
+  const normalizedAadhar = aadharNumber ? String(aadharNumber).trim() : "";
+
+  if (!normalizedPhone && !normalizedAadhar) {
+    throw createHttpError(400, "phone or aadharNumber is required");
+  }
+
+  const patient = await Patient.findOne({
+    $or: [
+      ...(normalizedPhone ? [{ contactNumber: normalizedPhone }] : []),
+      ...(normalizedAadhar ? [{ aadharNumber: normalizedAadhar }] : [])
+    ]
+  }).lean();
   return patient;
 }
 
 async function registerPatient(payload, actorId) {
-  const { fullName, age, dateOfBirth, gender, district, area, addressLine, contactNumber, location } = payload;
+  const {
+    fullName,
+    age,
+    dateOfBirth,
+    gender,
+    district,
+    city,
+    mandal,
+    village,
+    ward,
+    area,
+    addressLine,
+    contactNumber,
+    aadharNumber,
+    location
+  } = payload;
 
-  if (!fullName || !gender || !district || !area || !addressLine) {
-    throw createHttpError(400, "fullName, gender, district, area, addressLine are required");
+  const resolvedCity = city || district;
+  const resolvedMandal = String(mandal || area || "").trim();
+  const resolvedVillage = String(village || "").trim();
+  const resolvedWard = String(ward || "").trim();
+  const resolvedLocality = resolvedVillage || resolvedWard || String(area || "").trim();
+
+  if (!fullName || !gender || !resolvedCity || !resolvedMandal || !resolvedLocality || !contactNumber || !aadharNumber) {
+    throw createHttpError(
+      400,
+      "fullName, gender, city/district, mandal, village or ward, contactNumber, aadharNumber are required"
+    );
   }
 
   let derivedAge = Number(age);
@@ -127,6 +228,9 @@ async function registerPatient(payload, actorId) {
     if (Number.isNaN(parsedDob.getTime())) {
       throw createHttpError(400, "Invalid dateOfBirth");
     }
+    if (parsedDob > new Date()) {
+      throw createHttpError(400, "Date of birth cannot be in the future");
+    }
     derivedAge = calculateAgeFromDob(parsedDob);
   }
 
@@ -134,15 +238,28 @@ async function registerPatient(payload, actorId) {
     throw createHttpError(400, "Valid age or dateOfBirth is required");
   }
 
-  const normalizedPhone = contactNumber ? String(contactNumber).trim() : null;
-  if (normalizedPhone) {
-    const existingByPhone = await Patient.findOne({ contactNumber: normalizedPhone }).lean();
-    if (existingByPhone) {
-      throw createHttpError(
-        409,
-        `Phone already exists with patientCode ${existingByPhone.patientCode}`
-      );
-    }
+  const normalizedPhone = String(contactNumber || "").trim();
+  if (!/^\d{10}$/.test(normalizedPhone)) {
+    throw createHttpError(400, "Contact number must be exactly 10 digits");
+  }
+  const existingByPhone = await Patient.findOne({ contactNumber: normalizedPhone }).lean();
+  if (existingByPhone) {
+    throw createHttpError(
+      409,
+      `Phone already exists with patientCode ${existingByPhone.patientCode}`
+    );
+  }
+
+  const normalizedAadhar = String(aadharNumber || "").trim();
+  if (!/^\d{12}$/.test(normalizedAadhar)) {
+    throw createHttpError(400, "Aadhar number must be exactly 12 digits");
+  }
+  const existingByAadhar = await Patient.findOne({ aadharNumber: normalizedAadhar }).lean();
+  if (existingByAadhar) {
+    throw createHttpError(
+      409,
+      `Aadhar already exists with patientCode ${existingByAadhar.patientCode}`
+    );
   }
 
   const patient = await Patient.create({
@@ -150,10 +267,14 @@ async function registerPatient(payload, actorId) {
     dateOfBirth: parsedDob,
     age: derivedAge,
     gender: String(gender).toLowerCase().trim(),
-    district: String(district).trim(),
-    area: String(area).trim(),
-    addressLine: String(addressLine).trim(),
+    district: String(resolvedCity).trim(),
+    mandal: resolvedMandal,
+    village: resolvedVillage || null,
+    ward: resolvedWard || null,
+    area: resolvedLocality,
+    addressLine: String(addressLine || `${resolvedLocality}, ${resolvedMandal}, ${String(resolvedCity).trim()}`).trim(),
     contactNumber: normalizedPhone,
+    aadharNumber: normalizedAadhar,
     location: {
       lat: location?.lat ?? null,
       lng: location?.lng ?? null
@@ -173,7 +294,7 @@ async function registerPatient(payload, actorId) {
 }
 
 async function createAppointment(patientIdentifier, payload, actorId) {
-  const { scheduledAt, reason } = payload;
+  const { scheduledAt, visitDate, reason } = payload;
   if (!scheduledAt) {
     throw createHttpError(400, "scheduledAt is required");
   }
@@ -183,10 +304,16 @@ async function createAppointment(patientIdentifier, payload, actorId) {
     throw createHttpError(400, "Invalid scheduledAt datetime");
   }
 
+  const parsedVisitDate = visitDate ? new Date(visitDate) : date;
+  if (Number.isNaN(parsedVisitDate.getTime())) {
+    throw createHttpError(400, "Invalid visitDate datetime");
+  }
+
   const patient = await findPatientByIdentifier(patientIdentifier);
   const appointment = await Appointment.create({
     patient: patient._id,
     scheduledAt: date,
+    visitDate: parsedVisitDate,
     reason: reason ? String(reason).trim() : "",
     createdBy: actorId
   });
@@ -203,14 +330,29 @@ async function createAppointment(patientIdentifier, payload, actorId) {
 }
 
 async function getNurseQueue() {
-  return Appointment.find({ status: "scheduled" })
-    .populate("patient", "patientCode fullName age gender district area")
-    .sort({ scheduledAt: 1 })
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return Appointment.find({
+    status: "scheduled",
+    $or: [
+      { visitDate: { $gte: startOfDay, $lte: endOfDay } },
+      {
+        visitDate: null,
+        scheduledAt: { $gte: startOfDay, $lte: endOfDay }
+      }
+    ]
+  })
+    .populate("patient", "patientCode fullName age gender district mandal village ward area contactNumber")
+    .sort({ visitDate: 1, scheduledAt: 1 })
     .lean();
 }
 
 async function createMedicalRecord(appointmentId, payload, actorId) {
-  const { symptoms, vitals, nurseNotes } = payload;
+  const { symptoms, vitals, nurseNotes, chiefComplaint } = payload;
 
   const appointment = await Appointment.findById(appointmentId).lean();
   if (!appointment) {
@@ -242,8 +384,10 @@ async function createMedicalRecord(appointmentId, payload, actorId) {
       bpSystolic: vitals?.bpSystolic ?? null,
       bpDiastolic: vitals?.bpDiastolic ?? null,
       pulse: vitals?.pulse ?? null,
-      spo2: vitals?.spo2 ?? null
+      spo2: vitals?.spo2 ?? null,
+      respiratoryRate: vitals?.respiratoryRate ?? null
     },
+    chiefComplaint: chiefComplaint ? String(chiefComplaint).trim() : "",
     nurseNotes: nurseNotes ? String(nurseNotes).trim() : "",
     recordedBy: actorId,
     status: "in_review",
@@ -261,6 +405,13 @@ async function createMedicalRecord(appointmentId, payload, actorId) {
   });
 
   return record;
+}
+
+async function getLabQueue() {
+  return MedicalRecord.find({ status: "in_review" })
+    .populate("patient", "patientCode fullName district mandal village ward area")
+    .sort({ createdAt: -1 })
+    .lean();
 }
 
 async function uploadLabReport(recordId, payload, actorId, fileInfo) {
@@ -306,8 +457,8 @@ async function uploadLabReport(recordId, payload, actorId, fileInfo) {
 async function createDiagnosisWithPrediction(recordId, payload, actorId) {
   const { diseaseName, diagnosisNotes, doctorSeverity, prescription } = payload;
 
-  if (!diseaseName || !prescription || !Array.isArray(prescription.medicines) || prescription.medicines.length === 0) {
-    throw createHttpError(400, "diseaseName and prescription.medicines are required");
+  if (!prescription || !Array.isArray(prescription.medicines) || prescription.medicines.length === 0) {
+    throw createHttpError(400, "prescription.medicines are required");
   }
 
   const record = await MedicalRecord.findById(recordId).lean();
@@ -321,11 +472,18 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
   }
 
   const latestLabReports = await LabReport.find({ medicalRecord: recordId }).sort({ createdAt: -1 }).lean();
+  const previousDiagnosis = await Diagnosis.findOne({ patient: patient._id }).sort({ createdAt: -1 }).lean();
+  const resolvedDiseaseName = String(diseaseName || previousDiagnosis?.diseaseName || "").trim();
+
+  if (!resolvedDiseaseName) {
+    throw createHttpError(400, "diseaseName is required for first-time diagnosis");
+  }
+
   const diagnosis = await Diagnosis.create({
     patient: patient._id,
     medicalRecord: recordId,
     diagnosedBy: actorId,
-    diseaseName: String(diseaseName).trim(),
+    diseaseName: resolvedDiseaseName,
     diagnosisNotes: diagnosisNotes ? String(diagnosisNotes).trim() : "",
     doctorSeverity: doctorSeverity ? String(doctorSeverity).toLowerCase().trim() : null
   });
@@ -338,6 +496,24 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
     generalAdvice: prescription.generalAdvice ? String(prescription.generalAdvice).trim() : "",
     followUpDate: prescription.followUpDate ? new Date(prescription.followUpDate) : null
   });
+
+  if (createdPrescription.followUpDate) {
+    const followUpDateText = createdPrescription.followUpDate.toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+
+    await Notification.create({
+      patient: patient._id,
+      medicalRecord: recordId,
+      category: "follow_up",
+      title: "Follow-up visit scheduled",
+      message: `Hospital team requested a follow-up visit for ${diagnosis.diseaseName} on ${followUpDateText}.`,
+      followUpDate: createdPrescription.followUpDate,
+      createdBy: actorId
+    });
+  }
 
   const firstLab = latestLabReports[0] || null;
   const bp = `${record.vitals?.bpSystolic || 120}/${record.vitals?.bpDiastolic || 80}`;
@@ -382,7 +558,7 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
 
 async function getDoctorDashboard() {
   const records = await MedicalRecord.find({ status: { $in: ["in_review", "diagnosed"] } })
-    .populate("patient", "patientCode fullName age gender district area")
+    .populate("patient", "patientCode fullName age gender district mandal village ward area")
     .sort({ createdAt: -1 })
     .lean();
 
@@ -390,13 +566,14 @@ async function getDoctorDashboard() {
 }
 
 async function getPatientHistory(patientId, actorId) {
-  const [patient, medicalRecords, labReports, diagnoses, prescriptions, predictions] = await Promise.all([
+  const [patient, medicalRecords, labReports, diagnoses, prescriptions, predictions, notifications] = await Promise.all([
     Patient.findById(patientId).lean(),
     MedicalRecord.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     LabReport.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     Diagnosis.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     Prescription.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
-    Prediction.find({ patient: patientId }).sort({ createdAt: -1 }).lean()
+    Prediction.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
+    Notification.find({ patient: patientId }).sort({ createdAt: -1 }).lean()
   ]);
 
   if (!patient) {
@@ -413,28 +590,54 @@ async function getPatientHistory(patientId, actorId) {
     });
   }
 
+  const existingFollowUpDates = new Set(
+    notifications
+      .filter((item) => item.category === "follow_up" && item.followUpDate)
+      .map((item) => new Date(item.followUpDate).toISOString())
+  );
+
+  const derivedFollowUpNotifications = prescriptions
+    .filter((item) => item.followUpDate)
+    .filter((item) => !existingFollowUpDates.has(new Date(item.followUpDate).toISOString()))
+    .map((item) => ({
+      _id: `prescription-followup-${item._id}`,
+      patient: patientId,
+      medicalRecord: null,
+      category: "follow_up",
+      title: "Follow-up visit scheduled",
+      message: "Hospital team has scheduled a follow-up visit based on your prescription.",
+      followUpDate: item.followUpDate,
+      createdAt: item.createdAt
+    }));
+
   return {
     patient,
     medicalRecords,
     labReports,
     diagnoses,
     prescriptions,
-    predictions
+    predictions,
+    notifications: [...notifications, ...derivedFollowUpNotifications].sort(
+      (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    )
   };
 }
 
 async function getRecordSummary(recordId, actorId) {
   const record = await MedicalRecord.findById(recordId)
-    .populate("patient", "patientCode fullName age gender district area contactNumber")
+    .populate("patient", "patientCode fullName age gender district mandal village ward area contactNumber")
     .lean();
   if (!record) {
     throw createHttpError(404, "Medical record not found");
   }
 
-  const [labReports, diagnoses, prescriptions] = await Promise.all([
+  const [labReports, diagnoses, prescriptions, predictions, medicalRecords, notifications] = await Promise.all([
     LabReport.find({ medicalRecord: recordId }).sort({ createdAt: -1 }).lean(),
     Diagnosis.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
-    Prescription.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean()
+    Prescription.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
+    Prediction.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
+    MedicalRecord.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
+    Notification.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean()
   ]);
 
   await logAudit({
@@ -450,7 +653,11 @@ async function getRecordSummary(recordId, actorId) {
     latestLabReport: labReports[0] || null,
     labReports,
     diagnosisHistory: diagnoses,
-    prescriptions
+    prescriptions,
+    predictionHistory: predictions,
+    visitHistory: medicalRecords.filter((item) => String(item._id) !== String(recordId)),
+    notifications,
+    riskInsight: buildRiskInsight(predictions)
   };
 }
 
@@ -472,11 +679,12 @@ async function getMyPatientHistory(userId, actorId) {
 }
 
 module.exports = {
-  searchPatientByPhone,
+  searchPatient,
   registerPatient,
   createAppointment,
   getNurseQueue,
   createMedicalRecord,
+  getLabQueue,
   uploadLabReport,
   createDiagnosisWithPrediction,
   getDoctorDashboard,

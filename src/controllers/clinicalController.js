@@ -1,9 +1,10 @@
 const {
-  searchPatientByPhone,
+  searchPatient,
   registerPatient,
   createAppointment,
   getNurseQueue,
   createMedicalRecord,
+  getLabQueue,
   uploadLabReport,
   createDiagnosisWithPrediction,
   getDoctorDashboard,
@@ -13,9 +14,9 @@ const {
   getRecordSummary
 } = require("../services/clinicalService");
 
-async function searchPatientByPhoneHandler(req, res, next) {
+async function searchPatientHandler(req, res, next) {
   try {
-    const patient = await searchPatientByPhone(req.query.phone);
+    const patient = await searchPatient(req.query.phone, req.query.aadharNumber);
     return res.status(200).json({ patient });
   } catch (error) {
     return next(error);
@@ -53,6 +54,15 @@ async function createMedicalRecordHandler(req, res, next) {
   try {
     const record = await createMedicalRecord(req.params.appointmentId, req.body, req.user.id);
     return res.status(201).json({ medicalRecord: record });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function labQueueHandler(req, res, next) {
+  try {
+    const queue = await getLabQueue();
+    return res.status(200).json({ queue });
   } catch (error) {
     return next(error);
   }
@@ -145,11 +155,12 @@ async function recordSummaryHandler(req, res, next) {
 }
 
 module.exports = {
-  searchPatientByPhoneHandler,
+  searchPatientHandler,
   registerPatientHandler,
   createAppointmentHandler,
   nurseQueueHandler,
   createMedicalRecordHandler,
+  labQueueHandler,
   uploadLabReportHandler,
   diagnosePatientHandler,
   doctorDashboardHandler,

@@ -3,11 +3,12 @@ const { authenticate } = require("../middlewares/auth");
 const { authorize } = require("../middlewares/rbac");
 const { uploadLabReportImage } = require("../middlewares/upload");
 const {
-  searchPatientByPhoneHandler,
+  searchPatientHandler,
   registerPatientHandler,
   createAppointmentHandler,
   nurseQueueHandler,
   createMedicalRecordHandler,
+  labQueueHandler,
   uploadLabReportHandler,
   diagnosePatientHandler,
   doctorDashboardHandler,
@@ -21,11 +22,12 @@ const router = express.Router();
 
 router.use(authenticate);
 
-router.get("/patients/search-by-phone", authorize("receptionist", "hospital_admin"), searchPatientByPhoneHandler);
+router.get("/patients/search", authorize("receptionist", "hospital_admin"), searchPatientHandler);
 router.post("/patients", authorize("receptionist", "hospital_admin"), registerPatientHandler);
 router.post("/patients/:patientId/appointments", authorize("receptionist", "hospital_admin"), createAppointmentHandler);
 router.get("/nurse/queue", authorize("nurse", "hospital_admin"), nurseQueueHandler);
 router.post("/appointments/:appointmentId/records", authorize("nurse", "hospital_admin"), createMedicalRecordHandler);
+router.get("/lab/queue", authorize("lab_technician", "hospital_admin"), labQueueHandler);
 router.post(
   "/records/:recordId/lab-reports",
   authorize("lab_technician", "hospital_admin"),

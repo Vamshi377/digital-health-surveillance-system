@@ -40,6 +40,24 @@ const patientSchema = new Schema(
       trim: true,
       index: true
     },
+    mandal: {
+      type: String,
+      required: true,
+      trim: true,
+      index: true
+    },
+    village: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true
+    },
+    ward: {
+      type: String,
+      trim: true,
+      default: null,
+      index: true
+    },
     area: {
       type: String,
       required: true,
@@ -56,6 +74,13 @@ const patientSchema = new Schema(
       type: String,
       trim: true,
       maxlength: 20,
+      default: null,
+      index: true
+    },
+    aadharNumber: {
+      type: String,
+      trim: true,
+      maxlength: 12,
       default: null,
       index: true
     },
@@ -76,10 +101,15 @@ const patientSchema = new Schema(
   }
 );
 
-patientSchema.index({ district: 1, area: 1, createdAt: -1 });
+patientSchema.index({ district: 1, mandal: 1, area: 1, createdAt: -1 });
+patientSchema.index({ district: 1, mandal: 1, village: 1, ward: 1, createdAt: -1 });
 patientSchema.index(
   { contactNumber: 1 },
   { unique: true, sparse: true, partialFilterExpression: { contactNumber: { $type: "string" } } }
+);
+patientSchema.index(
+  { aadharNumber: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { aadharNumber: { $type: "string" } } }
 );
 
 patientSchema.pre("validate", function setPatientCode(next) {

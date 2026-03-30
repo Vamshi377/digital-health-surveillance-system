@@ -2,9 +2,17 @@ const { Prediction } = require("../models/Prediction");
 const { logAudit } = require("./auditService");
 const { createHttpError } = require("../utils/httpError");
 
+const DEFAULT_ACTIVE_WINDOW_DAYS = 14;
+
 function buildPredictionDateMatch(fromDate, toDate) {
   if (!fromDate && !toDate) {
-    return {};
+    const now = new Date();
+    return {
+      createdAt: {
+        $gte: new Date(now.getTime() - DEFAULT_ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000),
+        $lte: now
+      }
+    };
   }
 
   const match = { createdAt: {} };
@@ -20,12 +28,27 @@ function buildPredictionDateMatch(fromDate, toDate) {
 function buildWindow(fromDate, toDate) {
   const now = new Date();
   const currentTo = toDate ? new Date(toDate) : now;
-  const currentFrom = fromDate ? new Date(fromDate) : new Date(currentTo.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const currentFrom = fromDate
+    ? new Date(fromDate)
+    : new Date(currentTo.getTime() - DEFAULT_ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const duration = Math.max(1, currentTo.getTime() - currentFrom.getTime());
   const previousTo = new Date(currentFrom.getTime());
   const previousFrom = new Date(currentFrom.getTime() - duration);
 
   return { currentFrom, currentTo, previousFrom, previousTo };
+}
+
+function buildLatestPatientPredictionStages() {
+  return [
+    { $sort: { patient: 1, createdAt: -1, _id: -1 } },
+    {
+      $group: {
+        _id: "$patient",
+        latestPrediction: { $first: "$$ROOT" }
+      }
+    },
+    { $replaceRoot: { newRoot: "$latestPrediction" } }
+  ];
 }
 
 function mapDiseaseTotals(rows) {
@@ -45,11 +68,36 @@ function calculateDelta(current, previous) {
   return Number((((current - previous) / previous) * 100).toFixed(2));
 }
 
-async function getDmoDiseaseBurden({ district, area, fromDate, toDate }) {
+function buildGeoFilterStages(district, mandal) {
+  return [
+    ...(district ? [{ $match: { "patient.district": district } }] : []),
+    ...(mandal ? [{ $match: { $or: [{ "patient.mandal": mandal }, { "patient.area": mandal }] } }] : [])
+  ];
+}
+
+function buildMandalGroupId() {
+  return {
+    district: "$patient.district",
+    mandal: { $ifNull: ["$patient.mandal", "$patient.area"] },
+    locality: {
+      $ifNull: [
+        "$patient.village",
+        {
+          $ifNull: ["$patient.ward", "$patient.area"]
+        }
+      ]
+    },
+    disease: "$diseaseName"
+  };
+}
+
+async function getDmoDiseaseBurden({ district, mandal, area, fromDate, toDate }) {
   const match = buildPredictionDateMatch(fromDate, toDate);
+  const resolvedMandal = mandal || area;
 
   const pipeline = [
     { $match: match },
+    ...buildLatestPatientPredictionStages(),
     {
       $lookup: {
         from: "patients",
@@ -59,15 +107,10 @@ async function getDmoDiseaseBurden({ district, area, fromDate, toDate }) {
       }
     },
     { $unwind: "$patient" },
-    ...(district ? [{ $match: { "patient.district": district } }] : []),
-    ...(area ? [{ $match: { "patient.area": area } }] : []),
+    ...buildGeoFilterStages(district, resolvedMandal),
     {
       $group: {
-        _id: {
-          district: "$patient.district",
-          area: "$patient.area",
-          disease: "$diseaseName"
-        },
+        _id: buildMandalGroupId(),
         totalAffected: { $sum: 1 },
         lat: { $avg: "$patient.location.lat" },
         lng: { $avg: "$patient.location.lng" },
@@ -82,14 +125,16 @@ async function getDmoDiseaseBurden({ district, area, fromDate, toDate }) {
         }
       }
     },
-    { $sort: { "_id.district": 1, "_id.area": 1, "_id.disease": 1 } }
+    { $sort: { "_id.district": 1, "_id.mandal": 1, "_id.locality": 1, "_id.disease": 1 } }
   ];
 
   const rows = await Prediction.aggregate(pipeline);
 
-  const areaSummary = rows.map((item) => ({
+  const mandalSummary = rows.map((item) => ({
     district: item._id.district,
-    area: item._id.area,
+    mandal: item._id.mandal || "Unknown",
+    villageOrWard: item._id.locality || "Unknown",
+    area: item._id.mandal || "Unknown",
     disease: item._id.disease,
     totalAffected: item.totalAffected,
     lat: typeof item.lat === "number" ? Number(item.lat.toFixed(6)) : null,
@@ -103,23 +148,32 @@ async function getDmoDiseaseBurden({ district, area, fromDate, toDate }) {
 
   return {
     generatedAt: new Date().toISOString(),
-    totalBuckets: areaSummary.length,
-    areaSummary
+    totalBuckets: mandalSummary.length,
+    mandalSummary,
+    areaSummary: mandalSummary
   };
 }
 
-async function getDmoOverview({ district, area, fromDate, toDate }) {
+async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
   const match = buildPredictionDateMatch(fromDate, toDate);
   const { currentFrom, currentTo, previousFrom, previousTo } = buildWindow(fromDate, toDate);
+  const resolvedMandal = mandal || area;
+  const geoFilterStages = buildGeoFilterStages(district, resolvedMandal);
 
-  const geoFilterStages = [
-    ...(district ? [{ $match: { "patient.district": district } }] : []),
-    ...(area ? [{ $match: { "patient.area": area } }] : [])
-  ];
-
-  const [diseaseTotals, severityTotals, dailyTrend, areaDensity, outbreakWarnings, currentWindowDiseaseTotals, previousWindowDiseaseTotals] = await Promise.all([
+  const [
+    diseaseTotals,
+    severityTotals,
+    dailyTrend,
+    areaDensity,
+    outbreakWarnings,
+    currentWindowDiseaseTotals,
+    previousWindowDiseaseTotals,
+    currentAreaTotals,
+    previousAreaTotals
+  ] = await Promise.all([
     Prediction.aggregate([
       { $match: match },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -135,6 +189,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: match },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -150,6 +205,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: match },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -173,6 +229,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: match },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -187,7 +244,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
         $group: {
           _id: {
             district: "$patient.district",
-            area: "$patient.area"
+            mandal: { $ifNull: ["$patient.mandal", "$patient.area"] }
           },
           totalCases: { $sum: 1 },
           lat: { $avg: "$patient.location.lat" },
@@ -198,6 +255,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: match },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -212,7 +270,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
         $group: {
           _id: {
             district: "$patient.district",
-            area: "$patient.area",
+            mandal: { $ifNull: ["$patient.mandal", "$patient.area"] },
             disease: "$diseaseName"
           },
           totalCases: { $sum: 1 }
@@ -223,6 +281,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: { createdAt: { $gte: currentFrom, $lte: currentTo } } },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -237,6 +296,7 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
     ]),
     Prediction.aggregate([
       { $match: { createdAt: { $gte: previousFrom, $lte: previousTo } } },
+      ...buildLatestPatientPredictionStages(),
       {
         $lookup: {
           from: "patients",
@@ -248,12 +308,59 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
       { $unwind: "$patient" },
       ...geoFilterStages,
       { $group: { _id: "$diseaseName", totalAffected: { $sum: 1 } } }
+    ]),
+    Prediction.aggregate([
+      { $match: { createdAt: { $gte: currentFrom, $lte: currentTo } } },
+      ...buildLatestPatientPredictionStages(),
+      {
+        $lookup: {
+          from: "patients",
+          localField: "patient",
+          foreignField: "_id",
+          as: "patient"
+        }
+      },
+      { $unwind: "$patient" },
+      ...geoFilterStages,
+      {
+        $group: {
+          _id: {
+            district: "$patient.district",
+            mandal: { $ifNull: ["$patient.mandal", "$patient.area"] }
+          },
+          totalAffected: { $sum: 1 }
+        }
+      }
+    ]),
+    Prediction.aggregate([
+      { $match: { createdAt: { $gte: previousFrom, $lte: previousTo } } },
+      ...buildLatestPatientPredictionStages(),
+      {
+        $lookup: {
+          from: "patients",
+          localField: "patient",
+          foreignField: "_id",
+          as: "patient"
+        }
+      },
+      { $unwind: "$patient" },
+      ...geoFilterStages,
+      {
+        $group: {
+          _id: {
+            district: "$patient.district",
+            mandal: { $ifNull: ["$patient.mandal", "$patient.area"] }
+          },
+          totalAffected: { $sum: 1 }
+        }
+      }
     ])
   ]);
 
   const warnings = outbreakWarnings.map((row) => ({
     district: row._id.district,
-    area: row._id.area,
+    mandal: row._id.mandal,
+    area: row._id.mandal,
     disease: row._id.disease,
     totalCases: row.totalCases,
     outbreakWarning: true
@@ -262,6 +369,17 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
   const currentMap = mapDiseaseTotals(currentWindowDiseaseTotals);
   const previousMap = mapDiseaseTotals(previousWindowDiseaseTotals);
   const allDiseases = Array.from(new Set([...Object.keys(currentMap), ...Object.keys(previousMap)])).sort();
+  const currentAreaMap = currentAreaTotals.reduce((acc, item) => {
+    const key = `${item._id.district}::${item._id.mandal}`;
+    acc[key] = Number(item.totalAffected || 0);
+    return acc;
+  }, {});
+  const previousAreaMap = previousAreaTotals.reduce((acc, item) => {
+    const key = `${item._id.district}::${item._id.mandal}`;
+    acc[key] = Number(item.totalAffected || 0);
+    return acc;
+  }, {});
+  const allAreaKeys = Array.from(new Set([...Object.keys(currentAreaMap), ...Object.keys(previousAreaMap)])).sort();
 
   const diseaseComparisons = allDiseases.map((disease) => {
     const current = currentMap[disease] || 0;
@@ -281,24 +399,58 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
   const currentTotal = diseaseComparisons.reduce((acc, row) => acc + row.currentCases, 0);
   const previousTotal = diseaseComparisons.reduce((acc, row) => acc + row.previousCases, 0);
   const totalDeltaPct = calculateDelta(currentTotal, previousTotal);
+  const mandalComparisons = allAreaKeys.map((key) => {
+    const [districtName, mandalName] = key.split("::");
+    const current = currentAreaMap[key] || 0;
+    const previous = previousAreaMap[key] || 0;
+    const deltaPct = calculateDelta(current, previous);
+
+    return {
+      district: districtName,
+      mandal: mandalName,
+      area: mandalName,
+      currentCases: current,
+      previousCases: previous,
+      deltaPct,
+      trend: deltaPct > 0 ? "rising" : deltaPct < 0 ? "falling" : "stable"
+    };
+  });
+
+  const diseaseDistribution = diseaseTotals.reduce((acc, item) => {
+    const total = Number(item.totalAffected || 0);
+    const percentage = currentTotal > 0 ? Number(((total / currentTotal) * 100).toFixed(2)) : 0;
+    acc.push({ disease: item._id, totalAffected: total, percentage });
+    return acc;
+  }, []);
+
+  const districtSummary = {
+    totalCases: currentTotal,
+    topDisease: diseaseComparisons.sort((a, b) => b.currentCases - a.currentCases)[0]?.disease || "Unknown",
+    highRiskMandals: mandalComparisons.filter((item) => item.currentCases >= 15 || item.deltaPct >= 50).length,
+    totalMandals: mandalComparisons.length
+  };
 
   return {
     generatedAt: new Date().toISOString(),
     diseaseTotals: diseaseTotals.map((item) => ({ disease: item._id, totalAffected: item.totalAffected })),
+    diseaseDistribution,
     severityTotals: severityTotals.map((item) => ({ severity: item._id, total: item.total })),
     dailyTrend: dailyTrend.map((item) => ({ date: item._id.day, disease: item._id.disease, total: item.total })),
     geoHeatmap: areaDensity
       .filter((row) => typeof row.lat === "number" && typeof row.lng === "number")
       .map((row) => ({
         district: row._id.district,
-        area: row._id.area,
+        mandal: row._id.mandal,
+        area: row._id.mandal,
         totalCases: row.totalCases,
         lat: Number(row.lat.toFixed(6)),
         lng: Number(row.lng.toFixed(6))
       })),
+    districtSummary,
     outbreakSummary: {
       threshold: 5,
-      totalAlerts: warnings.length
+      totalAlerts: warnings.length,
+      activeWindowDays: fromDate || toDate ? null : DEFAULT_ACTIVE_WINDOW_DAYS
     },
     outbreakWarnings: warnings,
     weeklyComparison: {
@@ -317,19 +469,23 @@ async function getDmoOverview({ district, area, fromDate, toDate }) {
         trend: totalDeltaPct > 0 ? "rising" : totalDeltaPct < 0 ? "falling" : "stable"
       },
       diseases: diseaseComparisons
-    }
+    },
+    mandalComparisons,
+    areaComparisons: mandalComparisons
   };
 }
 
-async function getDmoPatientCluster({ district, area, disease, fromDate, toDate, limit = 100 }, actorId) {
-  if (!area || !disease) {
-    throw createHttpError(400, "area and disease are required");
+async function getDmoPatientCluster({ district, mandal, area, disease, fromDate, toDate, limit = 100 }, actorId) {
+  const resolvedMandal = mandal || area;
+  if (!resolvedMandal || !disease) {
+    throw createHttpError(400, "mandal and disease are required");
   }
 
   const match = buildPredictionDateMatch(fromDate, toDate);
 
   const cluster = await Prediction.aggregate([
     { $match: { ...match, diseaseName: disease } },
+    ...buildLatestPatientPredictionStages(),
     {
       $lookup: {
         from: "patients",
@@ -340,7 +496,7 @@ async function getDmoPatientCluster({ district, area, disease, fromDate, toDate,
     },
     { $unwind: "$patient" },
     ...(district ? [{ $match: { "patient.district": district } }] : []),
-    { $match: { "patient.area": area } },
+    { $match: { $or: [{ "patient.mandal": resolvedMandal }, { "patient.area": resolvedMandal }] } },
     { $sort: { createdAt: -1 } },
     { $limit: Number(limit) || 100 },
     {
@@ -352,6 +508,9 @@ async function getDmoPatientCluster({ district, area, disease, fromDate, toDate,
         contactNumber: "$patient.contactNumber",
         addressLine: "$patient.addressLine",
         district: "$patient.district",
+        mandal: { $ifNull: ["$patient.mandal", "$patient.area"] },
+        village: "$patient.village",
+        ward: "$patient.ward",
         area: "$patient.area",
         diseaseName: "$diseaseName",
         predictedSeverity: "$predictedSeverity",
@@ -366,15 +525,17 @@ async function getDmoPatientCluster({ district, area, disease, fromDate, toDate,
       actorId,
       action: "VIEW_PATIENT_CLUSTER",
       entityType: "Dashboard",
-      entityId: `${district || "ALL"}:${area}:${disease}`,
-      details: { district, area, disease, fromDate, toDate, limit }
+      entityId: `${district || "ALL"}:${resolvedMandal}:${disease}`,
+      details: { district, mandal: resolvedMandal, disease, fromDate, toDate, limit }
     });
   }
 
   return {
     district: district || "All",
-    area,
+    mandal: resolvedMandal,
+    area: resolvedMandal,
     disease,
+    activeWindowDays: fromDate || toDate ? null : DEFAULT_ACTIVE_WINDOW_DAYS,
     totalPatients: cluster.length,
     patients: cluster
   };

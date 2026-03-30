@@ -31,7 +31,13 @@ const medicalRecordSchema = new Schema(
       bpSystolic: { type: Number, min: 40, max: 260, default: null },
       bpDiastolic: { type: Number, min: 20, max: 180, default: null },
       pulse: { type: Number, min: 20, max: 250, default: null },
-      spo2: { type: Number, min: 0, max: 100, default: null }
+      spo2: { type: Number, min: 0, max: 100, default: null },
+      respiratoryRate: { type: Number, min: 0, max: 60, default: null }
+    },
+    chiefComplaint: {
+      type: String,
+      trim: true,
+      default: ""
     },
     nurseNotes: {
       type: String,

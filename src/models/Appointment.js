@@ -15,6 +15,11 @@ const appointmentSchema = new Schema(
       required: true,
       index: true
     },
+    visitDate: {
+      type: Date,
+      default: null,
+      index: true
+    },
     reason: {
       type: String,
       trim: true,
@@ -41,6 +46,7 @@ const appointmentSchema = new Schema(
 
 appointmentSchema.index({ patient: 1, scheduledAt: -1 });
 appointmentSchema.index({ status: 1, scheduledAt: 1 });
+appointmentSchema.index({ status: 1, visitDate: 1 });
 
 const Appointment = mongoose.model("Appointment", appointmentSchema);
 

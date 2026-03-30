@@ -1,113 +1,78 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import AppLayout from "./components/AppLayout";
-import ProtectedRoute from "./components/ProtectedRoute";
-import ApprovalPage from "./pages/ApprovalPage";
-import DMOPage from "./pages/DMOPage";
-import DoctorPage from "./pages/DoctorPage";
-import LabPage from "./pages/LabPage";
-import LoginPage from "./pages/LoginPage";
-import NursePage from "./pages/NursePage";
-import PatientPage from "./pages/PatientPage";
-import RegisterPage from "./pages/RegisterPage";
-import ReceptionPage from "./pages/ReceptionPage";
-import RoleHome from "./pages/RoleHome";
-import { useAuth } from "./state/AuthContext";
+import React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import DashboardShell from './components/layout/DashboardShell';
+import { useAuth } from './context/AuthContext';
+import AdminDashboard from './pages/AdminDashboard';
+import DMODashboard from './pages/DMODashboard';
+import DoctorDashboard from './pages/DoctorDashboard';
+import LabDashboard from './pages/LabDashboard';
+import LoginPage from './pages/LoginPage';
+import NurseDashboard from './pages/NurseDashboard';
+import PatientDashboard from './pages/PatientDashboard';
+import ReceptionDashboard from './pages/ReceptionDashboard';
 
-function PrivateApp() {
+const ROLE_ROUTES = {
+  receptionist: '/reception',
+  nurse: '/nurse',
+  lab_technician: '/lab',
+  doctor: '/doctor',
+  patient: '/patient',
+  hospital_admin: '/admin',
+  medical_superintendent: '/admin',
+  dmo: '/dmo'
+};
+
+function AppLoader() {
   return (
-    <AppLayout>
-      <Routes>
-        <Route path="/" element={<RoleHome />} />
-        <Route
-          path="/admin"
-          element={
-            <ProtectedRoute roles={["hospital_admin"]}>
-              <ApprovalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reception"
-          element={
-            <ProtectedRoute roles={["receptionist", "hospital_admin"]}>
-              <ReceptionPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/nurse"
-          element={
-            <ProtectedRoute roles={["nurse", "hospital_admin"]}>
-              <NursePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/lab"
-          element={
-            <ProtectedRoute roles={["lab_technician", "hospital_admin"]}>
-              <LabPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/doctor"
-          element={
-            <ProtectedRoute roles={["doctor", "hospital_admin"]}>
-              <DoctorPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/superintendent"
-          element={
-            <ProtectedRoute roles={["medical_superintendent"]}>
-              <ApprovalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dmo"
-          element={
-            <ProtectedRoute roles={["dmo", "hospital_admin"]}>
-              <DMOPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/dmo/approvals"
-          element={
-            <ProtectedRoute roles={["dmo"]}>
-              <ApprovalPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/patient"
-          element={
-            <ProtectedRoute roles={["patient"]}>
-              <PatientPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AppLayout>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      background: 'var(--surface-app)'
+    }}>
+      <div style={{
+        width: 48,
+        height: 48,
+        borderRadius: '50%',
+        border: '3px solid var(--neutral-200)',
+        borderTopColor: 'var(--brand-500)',
+        animation: 'spin 0.7s linear infinite'
+      }} />
+      <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+    </div>
   );
 }
 
-export default function App() {
-  const { isAuthenticated } = useAuth();
+function ProtectedRoute({ children, allowedRoles }) {
+  const { isAuthenticated, role, loading } = useAuth();
 
-  if (!isAuthenticated) {
-    return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    );
+  if (loading) return <AppLoader />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to={ROLE_ROUTES[role] || '/login'} replace />;
   }
+  return children;
+}
 
-  return <PrivateApp />;
+function RoleRedirect() {
+  const { role } = useAuth();
+  return <Navigate to={ROLE_ROUTES[role] || '/login'} replace />;
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/" element={<ProtectedRoute><RoleRedirect /></ProtectedRoute>} />
+      <Route path="/reception/*" element={<ProtectedRoute allowedRoles={['receptionist', 'hospital_admin']}><DashboardShell><ReceptionDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/nurse/*" element={<ProtectedRoute allowedRoles={['nurse', 'hospital_admin']}><DashboardShell><NurseDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/lab/*" element={<ProtectedRoute allowedRoles={['lab_technician', 'hospital_admin']}><DashboardShell><LabDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/doctor/*" element={<ProtectedRoute allowedRoles={['doctor', 'hospital_admin']}><DashboardShell><DoctorDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/patient/*" element={<ProtectedRoute allowedRoles={['patient']}><DashboardShell><PatientDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/admin/*" element={<ProtectedRoute allowedRoles={['hospital_admin', 'medical_superintendent', 'dmo']}><DashboardShell><AdminDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/dmo/*" element={<ProtectedRoute allowedRoles={['dmo', 'hospital_admin']}><DashboardShell><DMODashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
 }

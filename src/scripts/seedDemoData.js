@@ -57,8 +57,11 @@ async function seed() {
         age: 30,
         gender: "male",
         district: "District-1",
-        area: "Area-A",
-        addressLine: "Demo Address Line",
+        mandal: "Mandal-1",
+        village: "Village-A",
+        ward: null,
+        area: "Village-A",
+        addressLine: "Village-A, Mandal-1, District-1",
         contactNumber: "9000000000",
         registeredBy: admin._id
       }

@@ -8,8 +8,8 @@ const { Patient } = require("../models/Patient");
 const { Prediction } = require("../models/Prediction");
 
 const DEFAULT_AREAS = [
-  { district: "Hyderabad", area: "Hyderabad", lat: 17.4375, lng: 78.4482 },
-  { district: "Nizamabad", area: "Nizamabad", lat: 18.6725, lng: 78.0941 }
+  { district: "Hyderabad", mandal: "Amberpet", villageOrWard: "Ward 12", lat: 17.4375, lng: 78.4482 },
+  { district: "Nizamabad", mandal: "Nizamabad South", villageOrWard: "Ward 4", lat: 18.6725, lng: 78.0941 }
 ];
 
 const DISEASES = ["Dengue", "Malaria", "Typhoid", "Chikungunya", "Viral Fever"];
@@ -49,7 +49,8 @@ function loadTelanganaAreas() {
     const point = getFirstCoordinate(feature.geometry) || [78.5, 17.8];
     return {
       district: String(district).trim(),
-      area: String(district).trim(),
+      mandal: `${String(district).trim()} Urban`,
+      villageOrWard: `${String(district).trim()} Ward 1`,
       lat: Number(point[1]),
       lng: Number(point[0])
     };
@@ -76,8 +77,11 @@ async function run() {
       age: rand(5, 78),
       gender: pick(["male", "female", "other"]),
       district: place.district,
-      area: place.area,
-      addressLine: `${rand(1, 45)}-${rand(1, 12)} Main Road, ${place.area}`,
+      mandal: place.mandal,
+      village: place.villageOrWard.toLowerCase().includes("ward") ? null : place.villageOrWard,
+      ward: place.villageOrWard.toLowerCase().includes("ward") ? place.villageOrWard : null,
+      area: place.villageOrWard,
+      addressLine: `${rand(1, 45)}-${rand(1, 12)} Main Road, ${place.villageOrWard}, ${place.mandal}`,
       contactNumber: `9${String(100000000 + i).padStart(9, "0")}`.slice(0, 10),
       location: { lat: place.lat, lng: place.lng },
       registeredBy: admin._id
