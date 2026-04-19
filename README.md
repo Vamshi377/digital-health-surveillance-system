@@ -2,6 +2,8 @@
 
 Full-stack hospital workflow platform with severity prediction and DMO district surveillance for Telangana.
 
+> Full technical documentation lives in [`docs/`](./docs/README.md) — architecture, API reference, data models, ML service, DMO dashboard, deployment, security, and contributing guide.
+
 ## Stack
 - Backend: Node.js, Express, MongoDB (Mongoose), JWT, RBAC
 - ML service: Python FastAPI + XGBoost
