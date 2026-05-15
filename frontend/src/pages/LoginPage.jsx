@@ -8,7 +8,7 @@ const ROLE_OPTIONS = [
   { value: 'nurse', label: 'Nurse' },
   { value: 'lab_technician', label: 'Lab Technician' },
   { value: 'receptionist', label: 'Receptionist' },
-  { value: 'medical_superintendent', label: 'Medical Superintendent' },
+  { value: 'hospital_admin', label: 'Hospital Admin' },
   { value: 'dmo', label: 'DMO' },
   { value: 'patient', label: 'Patient' }
 ];
@@ -18,7 +18,7 @@ const PRESETS = [
   { label: 'Nurse', email: 'nurse@health.local', password: 'Nurse@123', role: 'nurse' },
   { label: 'Lab', email: 'lab@health.local', password: 'Lab@123', role: 'lab_technician' },
   { label: 'Doctor', email: 'doctor@health.local', password: 'Doctor@123', role: 'doctor' },
-  { label: 'Superintendent', email: 'ms@health.local', password: 'Superintendent@123', role: 'medical_superintendent' },
+  { label: 'Admin', email: 'hospitaladmin@health.local', password: 'HospitalAdmin@123', role: 'hospital_admin' },
   { label: 'DMO', email: 'dmo@health.local', password: 'Dmo@123', role: 'dmo' }
 ];
 
@@ -28,7 +28,7 @@ const ROLE_ROUTES = {
   lab_technician: '/lab',
   doctor: '/doctor',
   patient: '/patient',
-  medical_superintendent: '/admin',
+  hospital_admin: '/admin',
   dmo: '/dmo'
 };
 

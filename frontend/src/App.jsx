@@ -18,7 +18,7 @@ const ROLE_ROUTES = {
   lab_technician: '/lab',
   doctor: '/doctor',
   patient: '/patient',
-  medical_superintendent: '/admin',
+  hospital_admin: '/admin',
   dmo: '/dmo'
 };
 
@@ -86,8 +86,8 @@ export default function App() {
       <Route path="/patient/reports" element={<ProtectedRoute allowedRoles={['patient']}><DashboardShell><PatientDashboard /></DashboardShell></ProtectedRoute>} />
       <Route path="/patient/prescriptions" element={<ProtectedRoute allowedRoles={['patient']}><DashboardShell><PatientDashboard /></DashboardShell></ProtectedRoute>} />
 
-      <Route path="/admin" element={<ProtectedRoute allowedRoles={['medical_superintendent']}><DashboardShell><AdminDashboard /></DashboardShell></ProtectedRoute>} />
-      <Route path="/admin/approvals" element={<ProtectedRoute allowedRoles={['medical_superintendent']}><DashboardShell><AdminDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute allowedRoles={['hospital_admin']}><DashboardShell><AdminDashboard /></DashboardShell></ProtectedRoute>} />
+      <Route path="/admin/approvals" element={<ProtectedRoute allowedRoles={['hospital_admin']}><DashboardShell><AdminDashboard /></DashboardShell></ProtectedRoute>} />
 
       <Route path="/dmo" element={<ProtectedRoute allowedRoles={['dmo']}><DashboardShell><DMODashboard /></DashboardShell></ProtectedRoute>} />
       <Route path="/dmo/trends" element={<ProtectedRoute allowedRoles={['dmo']}><DashboardShell><DMODashboard /></DashboardShell></ProtectedRoute>} />

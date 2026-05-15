@@ -3,7 +3,7 @@ const { Patient } = require("../models/Patient");
 const { createHttpError } = require("../utils/httpError");
 const { USER_ROLES, APPROVAL_STATUSES, normalizeRole, getRequiredApproverRole } = require("../utils/roles");
 
-const STAFF_ROLES = new Set(["hospital_admin", "receptionist", "nurse", "doctor", "lab_technician", "medical_superintendent", "dmo"]);
+const STAFF_ROLES = new Set(["hospital_admin", "receptionist", "nurse", "doctor", "lab_technician", "dmo"]);
 
 async function createUserByAdmin(payload) {
   const { fullName, email, password, role, patientCode } = payload;

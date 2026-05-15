@@ -12,7 +12,7 @@ const {
 
 const router = express.Router();
 
-router.use(authenticate, authorize("hospital_admin", "medical_superintendent", "dmo"));
+router.use(authenticate, authorize("hospital_admin", "dmo"));
 
 router.get("/users", listUsersHandler);
 router.get("/audit-logs", listAuditLogsHandler);

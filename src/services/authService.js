@@ -92,7 +92,7 @@ function buildRoleProfile(role, payload) {
     profile.basicExperience = toOptionalNumber(payload.basicExperience);
   }
 
-  if (["medical_superintendent", "hospital_admin", "dmo"].includes(normalizedRole)) {
+  if (["hospital_admin", "dmo"].includes(normalizedRole)) {
     if (!payload.employeeId || !payload.officialEmail || !payload.departmentAuthority) {
       throw createHttpError(400, "This role requires employeeId, officialEmail, departmentAuthority");
     }

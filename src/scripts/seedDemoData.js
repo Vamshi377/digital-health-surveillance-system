@@ -87,12 +87,6 @@ async function seed() {
     role: "doctor"
   });
   await upsertUser({
-    fullName: "Medical Superintendent",
-    email: "ms@health.local",
-    password: "Superintendent@123",
-    role: "medical_superintendent"
-  });
-  await upsertUser({
     fullName: "Lab Technician One",
     email: "lab@health.local",
     password: "Lab@123",

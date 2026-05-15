@@ -8,7 +8,6 @@ const USER_ROLES = Object.freeze([
   "nurse",
   "lab_technician",
   "receptionist",
-  "medical_superintendent",
   "hospital_admin",
   "dmo",
   "patient"
@@ -17,11 +16,10 @@ const USER_ROLES = Object.freeze([
 const APPROVAL_STATUSES = Object.freeze(["PENDING", "APPROVED", "REJECTED"]);
 
 const APPROVER_BY_ROLE = Object.freeze({
-  doctor: "medical_superintendent",
-  nurse: "medical_superintendent",
-  lab_technician: "medical_superintendent",
+  doctor: "hospital_admin",
+  nurse: "hospital_admin",
+  lab_technician: "hospital_admin",
   receptionist: "hospital_admin",
-  medical_superintendent: "dmo",
   hospital_admin: "dmo"
 });
 

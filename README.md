@@ -41,7 +41,6 @@ Once a diagnosis is completed, the case contributes to the DMO analytics layer. 
 - `nurse`
 - `lab_technician`
 - `doctor`
-- `medical_superintendent`
 - `hospital_admin`
 - `dmo`
 - `patient`
@@ -163,7 +162,6 @@ This step is required if you want the preset login accounts to work. On a fresh 
 - `nurse@health.local` / `Nurse@123`
 - `lab@health.local` / `Lab@123`
 - `doctor@health.local` / `Doctor@123`
-- `ms@health.local` / `Superintendent@123`
 - `dmo@health.local` / `Dmo@123`
 - `patient@health.local` / `Patient@123`
 
@@ -185,9 +183,9 @@ Additional helper scripts are also available:
 
 The project includes role-specific account approval rules:
 
-- `doctor`, `nurse`, and `lab_technician` are approved by `medical_superintendent`
+- `doctor`, `nurse`, and `lab_technician` are approved by `hospital_admin`
 - `receptionist` is approved by `hospital_admin`
-- `medical_superintendent` and `hospital_admin` are approved by `dmo`
+- `hospital_admin` is approved by `dmo`
 - `dmo` can be pre-created by the system or seed data
 
 Users who are pending or rejected should not be able to use the platform normally.

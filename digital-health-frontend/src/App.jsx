@@ -29,9 +29,9 @@ export default function App() {
           <Route path="/login"    element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Admin / Hospital Admin / Medical Superintendent */}
+          {/* Admin / Hospital Admin */}
           <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['hospital_admin', 'medical_superintendent']}>
+            <ProtectedRoute allowedRoles={['hospital_admin']}>
               <AdminDashboard />
             </ProtectedRoute>
           } />

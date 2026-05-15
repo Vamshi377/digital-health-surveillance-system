@@ -12,14 +12,12 @@ const demoAccounts = [
   { role: 'nurse', label: 'Nurse', email: 'nurse@health.local', password: 'Nurse@123' },
   { role: 'lab_technician', label: 'Lab', email: 'lab@health.local', password: 'Lab@123' },
   { role: 'doctor', label: 'Doctor', email: 'doctor@health.local', password: 'Doctor@123' },
-  { role: 'medical_superintendent', label: 'MS', email: 'ms@health.local', password: 'Superintendent@123' },
   { role: 'dmo', label: 'DMO', email: 'dmo@health.local', password: 'Dmo@123' },
   { role: 'patient', label: 'Patient', phoneNumber: '9177324853' },
 ]
 
 const roleOptions = [
   { value: 'hospital_admin', label: 'Hospital Admin' },
-  { value: 'medical_superintendent', label: 'Medical Superintendent' },
   { value: 'receptionist', label: 'Receptionist' },
   { value: 'nurse', label: 'Nurse' },
   { value: 'lab_technician', label: 'Lab Technician' },
@@ -30,7 +28,6 @@ const roleOptions = [
 
 const roleRedirect = {
   hospital_admin: '/admin',
-  medical_superintendent: '/admin',
   receptionist: '/reception',
   nurse: '/nurse',
   lab_technician: '/lab',

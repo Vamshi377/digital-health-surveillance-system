@@ -38,8 +38,8 @@ export default function Topbar() {
       patient: [
         { title: 'Reports', text: 'Switch between reports and prescriptions using the sidebar sections.' }
       ],
-      medical_superintendent: [
-        { title: 'Approvals', text: 'Review staff registrations that require superintendent approval.' }
+      hospital_admin: [
+        { title: 'Approvals', text: 'Review staff registrations that require admin approval.' }
       ],
       dmo: [
         { title: 'Statistics', text: 'Use Statistics and Clusters sections to focus analytics views.' }

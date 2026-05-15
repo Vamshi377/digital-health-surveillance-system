@@ -33,7 +33,6 @@ The system has these roles:
 - Nurse
 - Lab Technician
 - Doctor
-- Medical Superintendent
 - DMO
 - Patient
 

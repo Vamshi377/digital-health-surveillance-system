@@ -42,7 +42,7 @@ const NAV_CONFIG = {
     { label: 'Reports', icon: FlaskConical, to: '/patient/reports' },
     { label: 'Prescriptions', icon: ClipboardList, to: '/patient/prescriptions' }
   ],
-  medical_superintendent: [
+  hospital_admin: [
     { label: 'Approvals', icon: ShieldCheck, to: '/admin' }
   ],
   dmo: [
@@ -58,7 +58,7 @@ const ROLE_LABELS = {
   lab_technician: 'Laboratory',
   doctor: 'Clinical Review',
   patient: 'Health Records',
-  medical_superintendent: 'Medical Superintendent',
+  hospital_admin: 'Hospital Admin',
   dmo: 'Digital Surveillance'
 };
 

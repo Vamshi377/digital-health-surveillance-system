@@ -32,7 +32,6 @@ The main modules are:
 The roles are:
 
 - Hospital Admin
-- Medical Superintendent
 - Receptionist
 - Nurse
 - Lab Technician

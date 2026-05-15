@@ -9,7 +9,6 @@ const ROLES = [
   { value: 'nurse',          label: 'Nurse' },
   { value: 'lab_technician', label: 'Lab Technician' },
   { value: 'doctor',         label: 'Doctor' },
-  { value: 'medical_superintendent', label: 'Medical Superintendent' },
   { value: 'hospital_admin', label: 'Hospital Admin' },
   { value: 'dmo', label: 'DMO' },
 ]
@@ -278,7 +277,7 @@ export default function RegisterPage() {
               </>
             )}
 
-            {['medical_superintendent', 'hospital_admin', 'dmo'].includes(form.role) && (
+            {['hospital_admin', 'dmo'].includes(form.role) && (
               <>
                 <div>
                   <label>Employee ID</label>

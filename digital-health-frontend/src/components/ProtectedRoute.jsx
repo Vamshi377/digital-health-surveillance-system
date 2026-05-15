@@ -28,7 +28,6 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     // Redirect to their own dashboard
     const roleRedirect = {
       hospital_admin: '/admin',
-      medical_superintendent: '/admin',
       receptionist:   '/reception',
       nurse:          '/nurse',
       lab_technician: '/lab',

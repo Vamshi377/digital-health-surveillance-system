@@ -94,10 +94,6 @@ Main functions:
 - Activate or suspend users.
 - Access selected operational dashboards when allowed.
 
-### Medical Superintendent
-
-Medical Superintendent is a management role. In this project it shares admin-level supervision access for hospital management.
-
 ### Receptionist
 
 Receptionist starts the patient journey.

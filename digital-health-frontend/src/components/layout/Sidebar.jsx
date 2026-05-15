@@ -7,7 +7,6 @@ import {
   Calendar,
   FlaskConical,
   Heart,
-  LayoutDashboard,
   LogOut,
   Menu,
   Shield,
@@ -27,7 +26,6 @@ const roleNavMap = {
   nurse: [{ to: '/nurse', icon: Heart, label: 'Nurse Station' }],
   lab_technician: [{ to: '/lab', icon: FlaskConical, label: 'Lab Console' }],
   doctor: [{ to: '/doctor', icon: Stethoscope, label: 'Clinical Review' }],
-  medical_superintendent: [{ to: '/admin', icon: LayoutDashboard, label: 'Admin Review' }],
   dmo: [{ to: '/dmo', icon: BarChart3, label: 'Surveillance' }],
   patient: [{ to: '/patient', icon: User, label: 'Health Records' }],
 }
@@ -38,7 +36,6 @@ const roleAccentMap = {
   nurse: '#ff7a94',
   lab_technician: '#f6b04d',
   doctor: '#8f95ff',
-  medical_superintendent: '#63d2ff',
   dmo: '#42f5c8',
   patient: '#57e5a8',
 }
@@ -49,7 +46,6 @@ const roleLabelMap = {
   nurse: 'Nurse',
   lab_technician: 'Lab Technician',
   doctor: 'Doctor',
-  medical_superintendent: 'Medical Superintendent',
   dmo: 'District Medical Officer',
   patient: 'Patient',
 }

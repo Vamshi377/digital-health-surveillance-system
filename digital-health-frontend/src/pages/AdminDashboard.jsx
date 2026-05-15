@@ -9,7 +9,6 @@ const ROLE_OPTIONS = [
   { value: 'nurse',                  label: 'Nurse' },
   { value: 'lab_technician',         label: 'Lab Technician' },
   { value: 'doctor',                 label: 'Doctor' },
-  { value: 'medical_superintendent', label: 'Medical Superintendent' },
   { value: 'hospital_admin',         label: 'Hospital Admin' },
   { value: 'dmo',                    label: 'DMO' },
   { value: 'patient',                label: 'Patient' },
@@ -17,7 +16,7 @@ const ROLE_OPTIONS = [
 
 const roleColors = {
   hospital_admin: '#00e5a0', receptionist: '#0099ff', nurse: '#f43f5e',
-  lab_technician: '#f59e0b', doctor: '#8b5cf6', medical_superintendent: '#06b6d4',
+  lab_technician: '#f59e0b', doctor: '#8b5cf6',
   dmo: '#22d3ee', patient: '#10b981',
 }
 

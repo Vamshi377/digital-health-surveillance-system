@@ -12,7 +12,6 @@ const roleStatus = {
   nurse: 'Clinical intake active',
   lab_technician: 'Diagnostics processing',
   doctor: 'AI-assisted review',
-  medical_superintendent: 'Hospital oversight',
   dmo: 'District surveillance',
   patient: 'Personal health access',
 }
