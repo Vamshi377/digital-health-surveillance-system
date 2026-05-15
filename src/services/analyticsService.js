@@ -3,6 +3,11 @@ const { logAudit } = require("./auditService");
 const { createHttpError } = require("../utils/httpError");
 
 const DEFAULT_ACTIVE_WINDOW_DAYS = 14;
+const PRIORITY_WINDOW_DAYS = 7;
+const PRIORITY_DISTRICT_HIGH_CASES_THRESHOLD = 10;
+const PRIORITY_DISTRICT_TOTAL_CASES_THRESHOLD = 50;
+const PRIORITY_MANDAL_HIGH_CASES_THRESHOLD = 5;
+const PRIORITY_MANDAL_TOTAL_CASES_THRESHOLD = 10;
 
 function buildPredictionDateMatch(fromDate, toDate) {
   if (!fromDate && !toDate) {
@@ -66,6 +71,147 @@ function calculateDelta(current, previous) {
     return 0;
   }
   return Number((((current - previous) / previous) * 100).toFixed(2));
+}
+
+function calculatePriorityScore({ low = 0, moderate = 0, high = 0 }) {
+  return Number(low || 0) + Number(moderate || 0) * 2 + Number(high || 0) * 3;
+}
+
+function buildPriorityReason(scope, item) {
+  if (scope === "district") {
+    return `${item.totalCases} cases in last ${PRIORITY_WINDOW_DAYS} days with ${item.highSeverityCases} high severity cases`;
+  } else {
+    return `${item.totalCases} cases in last ${PRIORITY_WINDOW_DAYS} days with ${item.highSeverityCases} high severity cases`;
+  }
+}
+
+function createPriorityWindow(fromDate, toDate) {
+  const now = new Date();
+  const to = toDate ? new Date(toDate) : now;
+  const from = fromDate
+    ? new Date(fromDate)
+    : new Date(to.getTime() - PRIORITY_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const windowDays = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)));
+  return { from, to, windowDays };
+}
+
+async function getPrioritySnapshot({ district, disease, fromDate, toDate }) {
+  const { from, to, windowDays } = createPriorityWindow(fromDate, toDate);
+  const baseMatch = { createdAt: { $gte: from, $lte: to } };
+  const diseaseMatch = disease ? [{ $match: { diseaseName: disease } }] : [];
+  const districtMatch = district ? [{ $match: { "patient.district": district } }] : [];
+
+  const [districtRows, mandalRows] = await Promise.all([
+    Prediction.aggregate([
+      { $match: baseMatch },
+      ...diseaseMatch,
+      ...buildLatestPatientPredictionStages(),
+      {
+        $lookup: {
+          from: "patients",
+          localField: "patient",
+          foreignField: "_id",
+          as: "patient"
+        }
+      },
+      { $unwind: "$patient" },
+      ...districtMatch,
+      {
+        $group: {
+          _id: "$patient.district",
+          totalCases: { $sum: 1 },
+          lowSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "low"] }, 1, 0] } },
+          moderateSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "moderate"] }, 1, 0] } },
+          highSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "high"] }, 1, 0] } }
+        }
+      },
+      { $sort: { totalCases: -1, _id: 1 } }
+    ]),
+    Prediction.aggregate([
+      { $match: baseMatch },
+      ...diseaseMatch,
+      ...buildLatestPatientPredictionStages(),
+      {
+        $lookup: {
+          from: "patients",
+          localField: "patient",
+          foreignField: "_id",
+          as: "patient"
+        }
+      },
+      { $unwind: "$patient" },
+      ...districtMatch,
+      {
+        $group: {
+          _id: {
+            district: "$patient.district",
+            mandal: { $ifNull: ["$patient.mandal", "$patient.area"] }
+          },
+          totalCases: { $sum: 1 },
+          lowSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "low"] }, 1, 0] } },
+          moderateSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "moderate"] }, 1, 0] } },
+          highSeverityCases: { $sum: { $cond: [{ $eq: ["$predictedSeverity", "high"] }, 1, 0] } }
+        }
+      },
+      { $sort: { totalCases: -1, "_id.district": 1, "_id.mandal": 1 } }
+    ])
+  ]);
+
+  const highPriorityDistricts = districtRows
+    .map((row) => {
+      const item = {
+        district: row._id || "Unknown",
+        totalCases: Number(row.totalCases || 0),
+        lowSeverityCases: Number(row.lowSeverityCases || 0),
+        moderateSeverityCases: Number(row.moderateSeverityCases || 0),
+        highSeverityCases: Number(row.highSeverityCases || 0)
+      };
+      item.priorityScore = calculatePriorityScore(item);
+      item.needsMedicalCamp =
+        item.totalCases >= PRIORITY_DISTRICT_TOTAL_CASES_THRESHOLD &&
+        item.highSeverityCases >= PRIORITY_DISTRICT_HIGH_CASES_THRESHOLD;
+      item.reason = buildPriorityReason("district", item);
+      return item;
+    })
+    .filter((item) => item.needsMedicalCamp)
+    .sort((left, right) => right.priorityScore - left.priorityScore || right.highSeverityCases - left.highSeverityCases || right.totalCases - left.totalCases || left.district.localeCompare(right.district));
+
+  const highPriorityMandals = mandalRows
+    .map((row) => {
+      const item = {
+        district: row._id.district || "Unknown",
+        mandal: row._id.mandal || "Unknown",
+        totalCases: Number(row.totalCases || 0),
+        lowSeverityCases: Number(row.lowSeverityCases || 0),
+        moderateSeverityCases: Number(row.moderateSeverityCases || 0),
+        highSeverityCases: Number(row.highSeverityCases || 0)
+      };
+      item.priorityScore = calculatePriorityScore(item);
+      item.reason = buildPriorityReason("mandal", item);
+      return item;
+    })
+    .filter((item) =>
+      item.totalCases >= PRIORITY_MANDAL_TOTAL_CASES_THRESHOLD &&
+      item.highSeverityCases >= PRIORITY_MANDAL_HIGH_CASES_THRESHOLD
+    )
+    .sort((left, right) => right.priorityScore - left.priorityScore || right.highSeverityCases - left.highSeverityCases || right.totalCases - left.totalCases || left.district.localeCompare(right.district) || left.mandal.localeCompare(right.mandal));
+
+  return {
+    windowDays,
+    from: from.toISOString(),
+    to: to.toISOString(),
+    districtThresholds: {
+      totalCases: PRIORITY_DISTRICT_TOTAL_CASES_THRESHOLD,
+      highSeverityCases: PRIORITY_DISTRICT_HIGH_CASES_THRESHOLD
+    },
+    mandalThresholds: {
+      totalCases: PRIORITY_MANDAL_TOTAL_CASES_THRESHOLD,
+      highSeverityCases: PRIORITY_MANDAL_HIGH_CASES_THRESHOLD
+    },
+    highPriorityDistricts,
+    highPriorityMandals
+  };
 }
 
 function buildGeoFilterStages(district, mandal) {
@@ -154,11 +300,12 @@ async function getDmoDiseaseBurden({ district, mandal, area, fromDate, toDate })
   };
 }
 
-async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
+async function getDmoOverview({ district, mandal, area, fromDate, toDate, alertThreshold }) {
   const match = buildPredictionDateMatch(fromDate, toDate);
   const { currentFrom, currentTo, previousFrom, previousTo } = buildWindow(fromDate, toDate);
   const resolvedMandal = mandal || area;
   const geoFilterStages = buildGeoFilterStages(district, resolvedMandal);
+  const outbreakThreshold = Math.max(Number(alertThreshold) || 5, 1);
 
   const [
     diseaseTotals,
@@ -169,7 +316,8 @@ async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
     currentWindowDiseaseTotals,
     previousWindowDiseaseTotals,
     currentAreaTotals,
-    previousAreaTotals
+    previousAreaTotals,
+    prioritySnapshot
   ] = await Promise.all([
     Prediction.aggregate([
       { $match: match },
@@ -276,7 +424,7 @@ async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
           totalCases: { $sum: 1 }
         }
       },
-      { $match: { totalCases: { $gt: 5 } } },
+      { $match: { totalCases: { $gte: outbreakThreshold } } },
       { $sort: { totalCases: -1 } }
     ]),
     Prediction.aggregate([
@@ -354,7 +502,8 @@ async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
           totalAffected: { $sum: 1 }
         }
       }
-    ])
+    ]),
+    getPrioritySnapshot({ district, disease: null, fromDate, toDate })
   ]);
 
   const warnings = outbreakWarnings.map((row) => ({
@@ -448,11 +597,12 @@ async function getDmoOverview({ district, mandal, area, fromDate, toDate }) {
       })),
     districtSummary,
     outbreakSummary: {
-      threshold: 5,
+      threshold: outbreakThreshold,
       totalAlerts: warnings.length,
       activeWindowDays: fromDate || toDate ? null : DEFAULT_ACTIVE_WINDOW_DAYS
     },
     outbreakWarnings: warnings,
+    prioritySummary: prioritySnapshot,
     weeklyComparison: {
       currentWindow: {
         from: currentFrom.toISOString(),
@@ -555,4 +705,68 @@ async function getDmoOverviewWithAudit(filters, actorId) {
   return data;
 }
 
-module.exports = { getDmoDiseaseBurden, getDmoOverview, getDmoOverviewWithAudit, getDmoPatientCluster };
+function csvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function toCsv(headers, rows) {
+  return [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => headers.map((key) => csvCell(row[key])).join(","))
+  ].join("\n");
+}
+
+async function getDmoAlerts(filters, actorId) {
+  const overview = await getDmoOverview(filters);
+  if (actorId) {
+    await logAudit({
+      actorId,
+      action: "VIEW_DMO_ALERTS",
+      entityType: "Dashboard",
+      entityId: "DMO_ALERTS",
+      details: filters || {}
+    });
+  }
+
+  return {
+    threshold: overview.outbreakSummary.threshold,
+    totalAlerts: overview.outbreakSummary.totalAlerts,
+    alerts: overview.outbreakWarnings
+  };
+}
+
+async function exportDmoDiseaseBurdenCsv(filters, actorId) {
+  const data = await getDmoDiseaseBurden(filters);
+  if (actorId) {
+    await logAudit({
+      actorId,
+      action: "EXPORT_DMO_DISEASE_BURDEN",
+      entityType: "Dashboard",
+      entityId: "DMO_EXPORT",
+      details: filters || {}
+    });
+  }
+
+  const rows = data.mandalSummary.map((row) => ({
+    district: row.district,
+    mandal: row.mandal,
+    villageOrWard: row.villageOrWard,
+    disease: row.disease,
+    totalAffected: row.totalAffected,
+    low: row.severity?.low || 0,
+    moderate: row.severity?.moderate || 0,
+    high: row.severity?.high || 0
+  }));
+
+  return toCsv(["district", "mandal", "villageOrWard", "disease", "totalAffected", "low", "moderate", "high"], rows);
+}
+
+module.exports = {
+  getDmoDiseaseBurden,
+  getDmoOverview,
+  getDmoOverviewWithAudit,
+  getDmoPatientCluster,
+  getDmoAlerts,
+  exportDmoDiseaseBurdenCsv
+};

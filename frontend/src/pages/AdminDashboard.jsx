@@ -1,34 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ShieldCheck, RefreshCw, UserPlus, Users } from 'lucide-react';
+import { ShieldCheck, RefreshCw, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
-import FormField, { Input, Select, Textarea } from '../components/ui/FormField';
-import Modal from '../components/ui/Modal';
+import { Input, Select } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import SectionCard from '../components/ui/SectionCard';
 import StatCard from '../components/ui/StatCard';
 import { adminService } from '../services/api';
-import { useAuth } from '../context/AuthContext';
-
-const EMPTY_CREATE_FORM = {
-  fullName: '',
-  email: '',
-  password: '',
-  role: 'patient',
-  patientCode: ''
-};
 
 export default function AdminDashboard() {
-  const { role } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [remarksByUser, setRemarksByUser] = useState({});
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
-  const [saving, setSaving] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -70,23 +56,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const createUser = async () => {
-    setSaving(true);
-    setMessage('');
-    setError('');
-    try {
-      await adminService.createUser(createForm);
-      setCreateOpen(false);
-      setCreateForm(EMPTY_CREATE_FORM);
-      setMessage('User created successfully.');
-      await loadUsers();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const columns = [
     { key: 'fullName', label: 'Full Name' },
     { key: 'email', label: 'Email' },
@@ -111,13 +80,12 @@ export default function AdminDashboard() {
   return (
     <div className="page-enter">
       <PageHeader
-        title="Admin & Approval Desk"
-        subtitle="Review registrations and manage approved user accounts"
+        title="Approval Desk"
+        subtitle="Review staff registrations and keep the user list clean"
         icon={ShieldCheck}
         actions={[
-          <Button key="refresh" icon={RefreshCw} variant="secondary" onClick={loadUsers}>Refresh</Button>,
-          role !== 'medical_superintendent' ? <Button key="create" icon={UserPlus} onClick={() => setCreateOpen(true)}>Create User</Button> : null
-        ].filter(Boolean)}
+          <Button key="refresh" icon={RefreshCw} variant="secondary" onClick={loadUsers}>Refresh</Button>
+        ]}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18, marginBottom: 28 }}>
@@ -135,48 +103,11 @@ export default function AdminDashboard() {
 
       <SectionCard
         title="User Approval Queue"
-        subtitle="Filter users and review registrations"
+        subtitle="Filter users and approve or reject pending registrations"
         actions={<Select value={filter} onChange={(event) => setFilter(event.target.value)}><option value="">All statuses</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></Select>}
       >
         <DataTable columns={columns} data={users} loading={loading} emptyMessage="No users found" />
       </SectionCard>
-
-      <Modal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        title="Create Approved User"
-        width={520}
-        footer={[
-          <Button key="cancel" variant="secondary" onClick={() => setCreateOpen(false)}>Cancel</Button>,
-          <Button key="save" loading={saving} onClick={createUser}>Create</Button>
-        ]}
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <FormField label="Full Name" required><Input value={createForm.fullName} onChange={(event) => setCreateForm((prev) => ({ ...prev, fullName: event.target.value }))} /></FormField>
-          <FormField label="Email" required><Input value={createForm.email} onChange={(event) => setCreateForm((prev) => ({ ...prev, email: event.target.value }))} /></FormField>
-          <FormField label="Password" required><Input type="password" value={createForm.password} onChange={(event) => setCreateForm((prev) => ({ ...prev, password: event.target.value }))} /></FormField>
-          <FormField label="Role" required>
-            <Select value={createForm.role} onChange={(event) => setCreateForm((prev) => ({ ...prev, role: event.target.value }))}>
-              <option value="patient">Patient</option>
-              <option value="doctor">Doctor</option>
-              <option value="nurse">Nurse</option>
-              <option value="lab_technician">Lab Technician</option>
-              <option value="receptionist">Receptionist</option>
-              <option value="hospital_admin">Hospital Admin</option>
-              <option value="medical_superintendent">Medical Superintendent</option>
-              <option value="dmo">DMO</option>
-            </Select>
-          </FormField>
-          {createForm.role === 'patient' && (
-            <FormField label="Patient Code" required style={{ gridColumn: '1 / -1' }}>
-              <Input value={createForm.patientCode} onChange={(event) => setCreateForm((prev) => ({ ...prev, patientCode: event.target.value }))} placeholder="PAT-XXXX" />
-            </FormField>
-          )}
-          <FormField label="Notes" hint="Approved users are created directly; role-specific registration details are not collected here." style={{ gridColumn: '1 / -1' }}>
-            <Textarea value="Created through admin console" readOnly />
-          </FormField>
-        </div>
-      </Modal>
     </div>
   );
 }

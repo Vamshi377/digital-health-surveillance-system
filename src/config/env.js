@@ -10,6 +10,8 @@ const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "8h",
   mlServiceUrl: process.env.ML_SERVICE_URL || "http://127.0.0.1:8000",
   mlServiceApiKey: process.env.ML_SERVICE_API_KEY || "",
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  geminiDietModel: process.env.GEMINI_DIET_MODEL || "gemini-2.5-flash",
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173"
 };
 

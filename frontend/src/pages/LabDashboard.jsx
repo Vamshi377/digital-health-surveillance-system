@@ -2,17 +2,30 @@ import React, { useEffect, useState } from 'react';
 import { FlaskConical, RefreshCw, Upload } from 'lucide-react';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
-import FormField, { Input, Textarea } from '../components/ui/FormField';
+import FormField, { Input, Select } from '../components/ui/FormField';
 import PageHeader from '../components/ui/PageHeader';
 import SectionCard from '../components/ui/SectionCard';
 import StatCard from '../components/ui/StatCard';
 import { clinicalService } from '../services/api';
 
+const TEST_OPTIONS = [
+  'CBC',
+  'LFT',
+  'KFT',
+  'Lipid Profile',
+  'Blood Sugar',
+  'Thyroid Profile',
+  'Urine Test',
+  'X-Ray',
+  'ECG',
+  'Scan'
+];
+
 export default function LabDashboard() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
-  const [form, setForm] = useState({ testName: '', valuesText: '{}', summary: '', reportImage: null });
+  const [form, setForm] = useState({ testName: '', reportImage: null });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -43,26 +56,28 @@ export default function LabDashboard() {
 
   const handleUpload = async () => {
     if (!selected?._id) return;
+    if (!form.testName || !form.reportImage) {
+      setError('Select a test name and upload a report file.');
+      return;
+    }
+
     setSaving(true);
     setMessage('');
     setError('');
 
     try {
-      JSON.parse(form.valuesText || '{}');
       const formData = new FormData();
       formData.append('testName', form.testName);
-      formData.append('values', form.valuesText || '{}');
-      formData.append('summary', form.summary || '');
-      if (form.reportImage) {
-        formData.append('reportImage', form.reportImage);
-      }
+      formData.append('values', '{}');
+      formData.append('summary', '');
+      formData.append('reportImage', form.reportImage);
       await clinicalService.uploadLabReport(selected._id, formData);
       setMessage('Lab report uploaded successfully.');
       setSelected(null);
-      setForm({ testName: '', valuesText: '{}', summary: '', reportImage: null });
+      setForm({ testName: '', reportImage: null });
       await loadQueue();
     } catch (err) {
-      setError(err.message.includes('JSON') ? 'Values must be valid JSON.' : err.message);
+      setError(err.message);
     } finally {
       setSaving(false);
     }
@@ -95,16 +110,23 @@ export default function LabDashboard() {
         <SectionCard title="Upload Lab Report" subtitle={selected ? `${selected.patient?.fullName} (${selected.patient?.patientCode})` : 'Select a record from queue'}>
           {selected ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <FormField label="Test Name" required><Input value={form.testName} onChange={(event) => setForm((prev) => ({ ...prev, testName: event.target.value }))} placeholder="CBC / LFT / X-Ray" /></FormField>
-              <FormField label="Values JSON" hint='Example: {"platelet_count": 120000, "wbc_count": 5600}'><Textarea value={form.valuesText} onChange={(event) => setForm((prev) => ({ ...prev, valuesText: event.target.value }))} /></FormField>
-              <FormField label="Summary"><Textarea value={form.summary} onChange={(event) => setForm((prev) => ({ ...prev, summary: event.target.value }))} /></FormField>
-              <FormField label="Report File"><Input type="file" onChange={(event) => setForm((prev) => ({ ...prev, reportImage: event.target.files?.[0] || null }))} /></FormField>
+              <FormField label="Test Name" required>
+                <Select value={form.testName} onChange={(event) => setForm((prev) => ({ ...prev, testName: event.target.value }))}>
+                  <option value="">Select test</option>
+                  {TEST_OPTIONS.map((test) => (
+                    <option key={test} value={test}>{test}</option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="Upload Document" required>
+                <Input type="file" onChange={(event) => setForm((prev) => ({ ...prev, reportImage: event.target.files?.[0] || null }))} />
+              </FormField>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button icon={Upload} loading={saving} onClick={handleUpload}>Upload Report</Button>
               </div>
             </div>
           ) : (
-            <div style={{ color: 'var(--neutral-500)', fontSize: '0.85rem' }}>Pick a queued record to upload test values and an optional file.</div>
+            <div style={{ color: 'var(--neutral-500)', fontSize: '0.85rem' }}>Pick a queued record, select the test name, and upload the report document.</div>
           )}
         </SectionCard>
       </div>

@@ -4,7 +4,9 @@ const { authorize } = require("../middlewares/rbac");
 const {
   dmoDiseaseBurdenHandler,
   dmoOverviewHandler,
-  dmoPatientClusterHandler
+  dmoPatientClusterHandler,
+  dmoAlertsHandler,
+  dmoExportHandler
 } = require("../controllers/analyticsController");
 
 const router = express.Router();
@@ -28,6 +30,20 @@ router.get(
   authenticate,
   authorize("dmo", "hospital_admin"),
   dmoPatientClusterHandler
+);
+
+router.get(
+  "/dmo/alerts",
+  authenticate,
+  authorize("dmo", "hospital_admin"),
+  dmoAlertsHandler
+);
+
+router.get(
+  "/dmo/export",
+  authenticate,
+  authorize("dmo", "hospital_admin"),
+  dmoExportHandler
 );
 
 module.exports = router;

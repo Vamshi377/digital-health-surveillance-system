@@ -9,20 +9,17 @@ const ROLE_OPTIONS = [
   { value: 'lab_technician', label: 'Lab Technician' },
   { value: 'receptionist', label: 'Receptionist' },
   { value: 'medical_superintendent', label: 'Medical Superintendent' },
-  { value: 'hospital_admin', label: 'Hospital Admin' },
   { value: 'dmo', label: 'DMO' },
   { value: 'patient', label: 'Patient' }
 ];
 
 const PRESETS = [
-  { label: 'Hospital Admin', email: 'hospitaladmin@health.local', password: 'HospitalAdmin@123', role: 'hospital_admin' },
   { label: 'Reception', email: 'reception@health.local', password: 'Reception@123', role: 'receptionist' },
   { label: 'Nurse', email: 'nurse@health.local', password: 'Nurse@123', role: 'nurse' },
   { label: 'Lab', email: 'lab@health.local', password: 'Lab@123', role: 'lab_technician' },
   { label: 'Doctor', email: 'doctor@health.local', password: 'Doctor@123', role: 'doctor' },
   { label: 'Superintendent', email: 'ms@health.local', password: 'Superintendent@123', role: 'medical_superintendent' },
-  { label: 'DMO', email: 'dmo@health.local', password: 'Dmo@123', role: 'dmo' },
-  { label: 'Patient', email: 'patient@health.local', password: 'Patient@123', role: 'patient' }
+  { label: 'DMO', email: 'dmo@health.local', password: 'Dmo@123', role: 'dmo' }
 ];
 
 const ROLE_ROUTES = {
@@ -31,7 +28,6 @@ const ROLE_ROUTES = {
   lab_technician: '/lab',
   doctor: '/doctor',
   patient: '/patient',
-  hospital_admin: '/admin',
   medical_superintendent: '/admin',
   dmo: '/dmo'
 };
@@ -39,9 +35,10 @@ const ROLE_ROUTES = {
 export default function LoginPage() {
   const { login, error, setError } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ email: '', password: '', role: 'doctor' });
+  const [form, setForm] = useState({ email: '', password: '', phoneNumber: '', role: 'doctor' });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const isPatientLogin = form.role === 'patient';
 
   const subtitle = useMemo(() => {
     const selected = ROLE_OPTIONS.find((item) => item.value === form.role);
@@ -50,7 +47,12 @@ export default function LoginPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!form.email || !form.password || !form.role) return;
+    if (!form.role) return;
+    if (isPatientLogin) {
+      if (!form.phoneNumber) return;
+    } else if (!form.email || !form.password) {
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -150,7 +152,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => {
                   setError(null);
-                  setForm({ email: preset.email, password: preset.password, role: preset.role });
+                  setForm({ email: preset.email, password: preset.password, phoneNumber: '', role: preset.role });
                 }}
                 style={{
                   border: '1px solid var(--neutral-200)',
@@ -185,44 +187,67 @@ export default function LoginPage() {
               </select>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--neutral-600)', marginBottom: 6 }}>Email address</label>
-              <input
-                type="email"
-                name="email"
-                value={form.email}
-                onChange={(event) => {
-                  setError(null);
-                  setForm((prev) => ({ ...prev, email: event.target.value }));
-                }}
-                placeholder="you@hospital.org"
-                required
-                autoComplete="email"
-                style={{ width: '100%', height: 44, padding: '0 14px', border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)', background: '#fff', color: 'var(--neutral-800)', fontSize: '0.9rem', outline: 'none' }}
-              />
-            </div>
+            {isPatientLogin ? (
+              <>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--neutral-600)', marginBottom: 6 }}>Mobile number</label>
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    value={form.phoneNumber}
+                    onChange={(event) => {
+                      setError(null);
+                      setForm((prev) => ({ ...prev, phoneNumber: event.target.value }));
+                    }}
+                    placeholder="10-digit mobile number"
+                    required
+                    autoComplete="tel"
+                    style={{ width: '100%', height: 44, padding: '0 14px', border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)', background: '#fff', color: 'var(--neutral-800)', fontSize: '0.9rem', outline: 'none' }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--neutral-600)', marginBottom: 6 }}>Email address</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={(event) => {
+                      setError(null);
+                      setForm((prev) => ({ ...prev, email: event.target.value }));
+                    }}
+                    placeholder="you@hospital.org"
+                    required
+                    autoComplete="email"
+                    style={{ width: '100%', height: 44, padding: '0 14px', border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)', background: '#fff', color: 'var(--neutral-800)', fontSize: '0.9rem', outline: 'none' }}
+                  />
+                </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--neutral-600)', marginBottom: 6 }}>Password</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPw ? 'text' : 'password'}
-                  name="password"
-                  value={form.password}
-                  onChange={(event) => {
-                    setError(null);
-                    setForm((prev) => ({ ...prev, password: event.target.value }));
-                  }}
-                  placeholder="********"
-                  required
-                  autoComplete="current-password"
-                  style={{ width: '100%', height: 44, padding: '0 44px 0 14px', border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)', background: '#fff', color: 'var(--neutral-800)', fontSize: '0.9rem', outline: 'none' }}
-                />
-                <button type="button" onClick={() => setShowPw((value) => !value)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--neutral-400)', display: 'flex', alignItems: 'center' }}>
-                  {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-                </button>
-              </div>
-            </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--neutral-600)', marginBottom: 6 }}>Password</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPw ? 'text' : 'password'}
+                      name="password"
+                      value={form.password}
+                      onChange={(event) => {
+                        setError(null);
+                        setForm((prev) => ({ ...prev, password: event.target.value }));
+                      }}
+                      placeholder="********"
+                      required
+                      autoComplete="current-password"
+                      style={{ width: '100%', height: 44, padding: '0 44px 0 14px', border: '1.5px solid var(--neutral-200)', borderRadius: 'var(--radius-md)', background: '#fff', color: 'var(--neutral-800)', fontSize: '0.9rem', outline: 'none' }}
+                    />
+                    <button type="button" onClick={() => setShowPw((value) => !value)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--neutral-400)', display: 'flex', alignItems: 'center' }}>
+                      {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {error && (
               <div style={{ background: 'var(--danger-50)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--danger-700)', fontSize: '0.85rem', fontWeight: 500 }}>
@@ -238,10 +263,22 @@ export default function LoginPage() {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
 
+            {isPatientLogin && (
+              <button
+                type="button"
+                onClick={() => navigate('/patient-register')}
+                style={{ height: 44, background: '#fff', color: 'var(--brand-600)', border: '1px solid var(--brand-200)', borderRadius: 'var(--radius-md)', fontSize: '0.9rem', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Generate Unique Patient ID
+              </button>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', background: 'var(--neutral-50)', border: '1px solid var(--neutral-100)', borderRadius: 'var(--radius-md)' }}>
               <ShieldCheck size={15} color="var(--success-500)" style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '0.775rem', color: 'var(--neutral-500)' }}>
-                Your session is encrypted and protected. Use the role selector because this backend validates role during login.
+                {isPatientLogin
+                  ? 'Register once to get a lifetime unique patient ID, then log in anytime using your registered mobile number.'
+                  : 'Your session is encrypted and protected. Use the role selector because this backend validates role during login.'}
               </span>
             </div>
           </form>

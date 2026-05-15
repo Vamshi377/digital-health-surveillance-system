@@ -1,131 +1,147 @@
 const mongoose = require("mongoose");
-const fs = require("fs");
-const path = require("path");
 const env = require("../config/env");
 const { connectDatabase } = require("../config/database");
 const { User } = require("../models/User");
 const { Patient } = require("../models/Patient");
 const { Prediction } = require("../models/Prediction");
+const { receptionCases } = require("./mockData/jagtialReceptionCases");
 
-const DEFAULT_AREAS = [
-  { district: "Hyderabad", mandal: "Amberpet", villageOrWard: "Ward 12", lat: 17.4375, lng: 78.4482 },
-  { district: "Nizamabad", mandal: "Nizamabad South", villageOrWard: "Ward 4", lat: 18.6725, lng: 78.0941 }
+const JAGTIAL_PRIORITY_PLAN = [
+  { mandal: "Jagtial", count: 18, high: 6 },
+  { mandal: "Korutla", count: 12, high: 5 },
+  { mandal: "Metpally", count: 10, high: 5 },
+  { mandal: "Raikal", count: 8, high: 3 },
+  { mandal: "Dharmapuri", count: 8, high: 3 },
+  { mandal: "Gollapalli", count: 6, high: 2 }
 ];
 
-const DISEASES = ["Dengue", "Malaria", "Typhoid", "Chikungunya", "Viral Fever"];
-const SEVERITIES = ["low", "moderate", "high"];
-
-function pick(array) {
-  return array[Math.floor(Math.random() * array.length)];
+function buildPhone(index) {
+  return `7${String(100000000 + index).padStart(9, "0")}`.slice(0, 10);
 }
 
-function rand(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+function buildAadhar(index) {
+  return `88${String(1000000000 + index).padStart(10, "0")}`.slice(0, 12);
 }
 
-function getFirstCoordinate(geometry) {
-  if (!geometry || !geometry.coordinates) return null;
-  if (geometry.type === "Polygon") return geometry.coordinates?.[0]?.[0] || null;
-  if (geometry.type === "MultiPolygon") return geometry.coordinates?.[0]?.[0]?.[0] || null;
-  return null;
+function buildPatientCode(index) {
+  return `PAT-JGT-DMO-${String(index).padStart(3, "0")}`;
 }
 
-function loadTelanganaAreas() {
-  const geoPath = path.resolve(__dirname, "..", "..", "frontend", "public", "data", "telanganaDistricts.json");
-  if (!fs.existsSync(geoPath)) {
-    return DEFAULT_AREAS;
+function buildCreatedAt(sequence, offsetHours) {
+  const now = new Date();
+  const dayOffset = sequence % 4;
+  const createdAt = new Date(now.getTime() - dayOffset * 24 * 60 * 60 * 1000);
+  createdAt.setHours(9 + (offsetHours % 8), (sequence * 7) % 60, 0, 0);
+  return createdAt;
+}
+
+function getMandalEntries(mandal) {
+  return receptionCases.filter((entry) => entry.mandal === mandal);
+}
+
+function getSeverity(index, highCount) {
+  if (index < highCount) return "high";
+  if (index < highCount + 2) return "moderate";
+  return "low";
+}
+
+function getDisease(mandal, index) {
+  if (mandal === "Jagtial" || mandal === "Korutla") {
+    return index % 4 === 0 ? "Malaria" : "Dengue";
   }
-
-  const geo = JSON.parse(fs.readFileSync(geoPath, "utf-8"));
-  const features = Array.isArray(geo?.features) ? geo.features : [];
-  if (!features.length) {
-    return DEFAULT_AREAS;
+  if (mandal === "Metpally") {
+    return index % 3 === 0 ? "Viral Fever" : "Dengue";
   }
-
-  return features.map((feature) => {
-    const props = feature.properties || {};
-    const district =
-      props.D_NAME || props.D_N || props.district || props.DISTRICT || props.dist_name || props.name || "Unknown";
-    const point = getFirstCoordinate(feature.geometry) || [78.5, 17.8];
-    return {
-      district: String(district).trim(),
-      mandal: `${String(district).trim()} Urban`,
-      villageOrWard: `${String(district).trim()} Ward 1`,
-      lat: Number(point[1]),
-      lng: Number(point[0])
-    };
-  });
+  return index % 2 === 0 ? "Dengue" : "Malaria";
 }
 
 async function run() {
   await connectDatabase();
 
-  const admin =
-    (await User.findOne({ role: "hospital_admin" }).lean()) ||
-    (await User.findOne({ email: "hospitaladmin@health.local" }).lean());
+  const seededBy =
+    (await User.findOne({ email: "reception@health.local", role: "receptionist" }).lean()) ||
+    (await User.findOne({ email: "doctor@health.local", role: "doctor" }).lean()) ||
+    (await User.findOne({ role: "hospital_admin" }).lean());
 
-  if (!admin) {
-    throw new Error("Hospital admin user not found. Run npm run seed first.");
+  if (!seededBy) {
+    throw new Error("Receptionist, doctor, or hospital admin user not found. Run npm run seed first.");
   }
 
-  const telanganaAreas = loadTelanganaAreas();
+  await Prediction.deleteMany({ modelSource: "jagtial-dmo-mock" });
+
   const patients = [];
-  for (let i = 0; i < 240; i += 1) {
-    const place = pick(telanganaAreas);
-    patients.push({
-      fullName: `DMO Demo Patient ${i + 1}`,
-      age: rand(5, 78),
-      gender: pick(["male", "female", "other"]),
-      district: place.district,
-      mandal: place.mandal,
-      village: place.villageOrWard.toLowerCase().includes("ward") ? null : place.villageOrWard,
-      ward: place.villageOrWard.toLowerCase().includes("ward") ? place.villageOrWard : null,
-      area: place.villageOrWard,
-      addressLine: `${rand(1, 45)}-${rand(1, 12)} Main Road, ${place.villageOrWard}, ${place.mandal}`,
-      contactNumber: `9${String(100000000 + i).padStart(9, "0")}`.slice(0, 10),
-      location: { lat: place.lat, lng: place.lng },
-      registeredBy: admin._id
-    });
-  }
+  let sequence = 1;
 
-  const createdPatients = await Patient.insertMany(patients, { ordered: false }).catch((error) => {
-    if (error?.writeErrors?.length) {
-      return Patient.find({ fullName: /DMO Demo Patient/ }).lean();
+  for (const plan of JAGTIAL_PRIORITY_PLAN) {
+    const entries = getMandalEntries(plan.mandal);
+    if (!entries.length) {
+      throw new Error(`No mock entries found for mandal ${plan.mandal}`);
     }
-    throw error;
-  });
 
-  const patientList = Array.isArray(createdPatients) ? createdPatients : [];
-  if (!patientList.length) {
-    throw new Error("Unable to seed mock patients");
-  }
+    for (let i = 0; i < plan.count; i += 1) {
+      const source = entries[i % entries.length];
+      const phoneNumber = buildPhone(sequence);
+      const aadharNumber = buildAadhar(sequence);
+      const patientCode = buildPatientCode(sequence);
 
-  const predictions = [];
-  patientList.forEach((patient) => {
-    const totalPredictions = rand(1, 3);
-    for (let i = 0; i < totalPredictions; i += 1) {
-      const createdAt = new Date(Date.now() - rand(1, 10) * 24 * 60 * 60 * 1000 - rand(1, 23) * 60 * 60 * 1000);
-      predictions.push({
+      let patient = await Patient.findOne({ contactNumber: phoneNumber });
+      const payload = {
+        patientCode,
+        fullName: `${source.fullName} Jagtial Mock ${sequence}`,
+        dateOfBirth: new Date(`199${sequence % 10}-0${(sequence % 8) + 1}-1${sequence % 9}T00:00:00.000Z`),
+        age: 18 + (sequence % 45),
+        gender: sequence % 2 === 0 ? "female" : "male",
+        district: "Jagtial",
+        mandal: source.mandal,
+        village: source.village,
+        ward: null,
+        area: source.village,
+        addressLine: `${source.village}, ${source.mandal}, Jagtial`,
+        contactNumber: phoneNumber,
+        aadharNumber,
+        registeredBy: seededBy._id
+      };
+
+      if (patient) {
+        Object.assign(patient, payload);
+        await patient.save();
+      } else {
+        patient = await Patient.create(payload);
+      }
+
+      const severity = getSeverity(i, plan.high);
+      const diseaseName = getDisease(plan.mandal, i);
+      const createdAt = buildCreatedAt(sequence, i);
+
+      await Prediction.create({
         patient: patient._id,
         diagnosis: new mongoose.Types.ObjectId(),
-        diseaseName: pick(DISEASES),
-        probability: Number((Math.random() * 0.35 + 0.6).toFixed(2)),
-        predictedSeverity: pick(SEVERITIES),
-        modelSource: "demo-mock-seed",
-        features: { mock: true },
+        diseaseName,
+        probability: severity === "high" ? 0.91 : severity === "moderate" ? 0.74 : 0.58,
+        predictedSeverity: severity,
+        modelSource: "jagtial-dmo-mock",
+        features: {
+          district: "Jagtial",
+          mandal: source.mandal,
+          village: source.village,
+          mock: true
+        },
         createdAt,
         updatedAt: createdAt
       });
+
+      patients.push(patient);
+      sequence += 1;
     }
-  });
+  }
 
-  await Prediction.insertMany(predictions, { ordered: false });
-
-  console.log(`DMO mock data seeded successfully on ${env.mongoUri}`);
+  console.log(`Jagtial DMO mock data seeded successfully on ${env.mongoUri}`);
+  console.log(`Patients ensured: ${patients.length}`);
+  console.log(`Predictions ensured: ${patients.length}`);
   process.exit(0);
 }
 
 run().catch((error) => {
-  console.error("DMO mock seed failed:", error.message);
+  console.error("Jagtial DMO mock seed failed:", error.message);
   process.exit(1);
 });

@@ -1,7 +1,9 @@
 const {
   getDmoDiseaseBurden,
   getDmoOverviewWithAudit,
-  getDmoPatientCluster
+  getDmoPatientCluster,
+  getDmoAlerts,
+  exportDmoDiseaseBurdenCsv
 } = require("../services/analyticsService");
 
 async function dmoDiseaseBurdenHandler(req, res, next) {
@@ -27,7 +29,8 @@ async function dmoOverviewHandler(req, res, next) {
       mandal: req.query.mandal,
       area: req.query.area,
       fromDate: req.query.fromDate,
-      toDate: req.query.toDate
+      toDate: req.query.toDate,
+      alertThreshold: req.query.alertThreshold
     };
     const data = await getDmoOverviewWithAudit(filters, req.user?.id);
 
@@ -58,4 +61,50 @@ async function dmoPatientClusterHandler(req, res, next) {
   }
 }
 
-module.exports = { dmoDiseaseBurdenHandler, dmoOverviewHandler, dmoPatientClusterHandler };
+async function dmoAlertsHandler(req, res, next) {
+  try {
+    const data = await getDmoAlerts(
+      {
+        district: req.query.district,
+        mandal: req.query.mandal,
+        area: req.query.area,
+        fromDate: req.query.fromDate,
+        toDate: req.query.toDate,
+        alertThreshold: req.query.alertThreshold
+      },
+      req.user?.id
+    );
+
+    return res.status(200).json(data);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function dmoExportHandler(req, res, next) {
+  try {
+    const csv = await exportDmoDiseaseBurdenCsv(
+      {
+        district: req.query.district,
+        mandal: req.query.mandal,
+        area: req.query.area,
+        fromDate: req.query.fromDate,
+        toDate: req.query.toDate
+      },
+      req.user?.id
+    );
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=dmo-disease-burden.csv");
+    return res.status(200).send(csv);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = {
+  dmoDiseaseBurdenHandler,
+  dmoOverviewHandler,
+  dmoPatientClusterHandler,
+  dmoAlertsHandler,
+  dmoExportHandler
+};

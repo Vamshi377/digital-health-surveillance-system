@@ -79,7 +79,8 @@ export default function PatientDashboard() {
         <div className="card" style={{ padding: '14px 18px', marginBottom: 18 }}>
           <div style={{ fontWeight: 700, color: 'var(--neutral-800)', marginBottom: 6 }}>Patient Identity</div>
           <div style={{ fontSize: '0.88rem', color: 'var(--neutral-600)', lineHeight: 1.6 }}>
-            <strong>Patient Code:</strong> {history.patient.patientCode || '-'}{' '}
+            <strong>Global Patient ID:</strong> {history.patient.patientCode || '-'}{' '}
+            <strong style={{ marginLeft: 14 }}>Hospital Patient ID:</strong> {history.patient.hospitalPatientId || '-'}{' '}
             <strong style={{ marginLeft: 14 }}>Contact:</strong> {history.patient.contactNumber || '-'}
           </div>
         </div>

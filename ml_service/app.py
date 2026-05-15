@@ -95,3 +95,9 @@ def predict(payload: PredictRequest) -> PredictResponse:
         risk_score=round(risk_score, 4),
         severity=predicted_label.capitalize(),
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=False)

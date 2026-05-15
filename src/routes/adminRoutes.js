@@ -6,7 +6,8 @@ const {
   updateUserRoleHandler,
   updateUserStatusHandler,
   listUsersHandler,
-  reviewUserApprovalHandler
+  reviewUserApprovalHandler,
+  listAuditLogsHandler
 } = require("../controllers/adminController");
 
 const router = express.Router();
@@ -14,6 +15,7 @@ const router = express.Router();
 router.use(authenticate, authorize("hospital_admin", "medical_superintendent", "dmo"));
 
 router.get("/users", listUsersHandler);
+router.get("/audit-logs", listAuditLogsHandler);
 router.patch("/users/:userId/approval", reviewUserApprovalHandler);
 router.use(authorize("hospital_admin", "dmo"));
 router.post("/users", createUserHandler);

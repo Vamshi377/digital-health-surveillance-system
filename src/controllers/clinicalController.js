@@ -11,7 +11,10 @@ const {
   getPatientHistory,
   getPatientHistoryByCode,
   getMyPatientHistory,
-  getRecordSummary
+  getRecordSummary,
+  selfRegisterPatient,
+  getMyNotifications,
+  exportMyPatientHistoryCsv
 } = require("../services/clinicalService");
 
 async function searchPatientHandler(req, res, next) {
@@ -27,6 +30,15 @@ async function registerPatientHandler(req, res, next) {
   try {
     const patient = await registerPatient(req.body, req.user.id);
     return res.status(201).json({ patient });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function selfRegisterPatientHandler(req, res, next) {
+  try {
+    const result = await selfRegisterPatient(req.body);
+    return res.status(result.alreadyExists ? 200 : 201).json(result);
   } catch (error) {
     return next(error);
   }
@@ -138,7 +150,7 @@ async function patientHistoryByCodeHandler(req, res, next) {
 
 async function myRecordsHandler(req, res, next) {
   try {
-    const history = await getMyPatientHistory(req.user.id, req.user.id);
+    const history = await getMyPatientHistory(req.user.patientId || req.user.id, req.user.id);
     return res.status(200).json(history);
   } catch (error) {
     return next(error);
@@ -154,9 +166,30 @@ async function recordSummaryHandler(req, res, next) {
   }
 }
 
+async function myNotificationsHandler(req, res, next) {
+  try {
+    const notifications = await getMyNotifications(req.user.patientId || req.user.id);
+    return res.status(200).json({ notifications });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function exportMyHistoryHandler(req, res, next) {
+  try {
+    const csv = await exportMyPatientHistoryCsv(req.user.patientId || req.user.id, req.user.id);
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=patient-history.csv");
+    return res.status(200).send(csv);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   searchPatientHandler,
   registerPatientHandler,
+  selfRegisterPatientHandler,
   createAppointmentHandler,
   nurseQueueHandler,
   createMedicalRecordHandler,
@@ -167,5 +200,7 @@ module.exports = {
   recordSummaryHandler,
   patientHistoryHandler,
   patientHistoryByCodeHandler,
-  myRecordsHandler
+  myRecordsHandler,
+  myNotificationsHandler,
+  exportMyHistoryHandler
 };

@@ -19,7 +19,15 @@ except ModuleNotFoundError:
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATASET_PATH = BASE_DIR / "data" / "demo_dataset.csv"
+PRIMARY_DATASET_PATH = BASE_DIR / "data" / "severity_dataset.csv"
+LEGACY_DATASET_PATH = BASE_DIR / "data" / "severity_dataset_25000.csv"
+DATASET_PATH = (
+    PRIMARY_DATASET_PATH
+    if PRIMARY_DATASET_PATH.exists()
+    else LEGACY_DATASET_PATH
+    if LEGACY_DATASET_PATH.exists()
+    else BASE_DIR / "data" / "demo_dataset.csv"
+)
 MODEL_PATH = BASE_DIR / "artifacts" / "severity_model.joblib"
 METRICS_PATH = BASE_DIR / "artifacts" / "severity_metrics.json"
 
@@ -36,6 +44,7 @@ def normalize_severity(label: str) -> str:
 def train_and_save() -> None:
     feature_rows: list[dict[str, float]] = []
     labels: list[str] = []
+    splits: list[str] = []
 
     with DATASET_PATH.open("r", encoding="utf-8") as dataset_file:
         reader = csv.DictReader(dataset_file)
@@ -50,6 +59,7 @@ def train_and_save() -> None:
             )
             feature_rows.append(features)
             labels.append(normalize_severity(str(row["severity"])))
+            splits.append(str(row.get("split", "")).strip().lower())
 
     if not feature_rows:
         raise ValueError("Dataset is empty. Cannot train model.")
@@ -59,14 +69,23 @@ def train_and_save() -> None:
 
     encoder = LabelEncoder()
     y = encoder.fit_transform(labels)
+    has_explicit_split = all(split in {"train", "test"} for split in splits) and "test" in splits
 
-    X_train, X_val, y_train, y_val = train_test_split(
-        X,
-        y,
-        test_size=0.25,
-        random_state=42,
-        stratify=y,
-    )
+    if has_explicit_split:
+        train_indices = [index for index, split in enumerate(splits) if split == "train"]
+        test_indices = [index for index, split in enumerate(splits) if split == "test"]
+        X_train = X[train_indices]
+        X_val = X[test_indices]
+        y_train = y[train_indices]
+        y_val = y[test_indices]
+    else:
+        X_train, X_val, y_train, y_val = train_test_split(
+            X,
+            y,
+            test_size=0.20,
+            random_state=42,
+            stratify=y,
+        )
 
     model = XGBClassifier(
         objective="multi:softprob",
@@ -106,7 +125,11 @@ def train_and_save() -> None:
         "accuracy": round(accuracy, 4),
         "classification_report": report,
         "classes": list(encoder.classes_),
+        "dataset": str(DATASET_PATH),
+        "split_strategy": "explicit 80:20 train/test column" if has_explicit_split else "stratified train_test_split test_size=0.20",
+        "train_size": int(len(y_train)),
         "validation_size": int(len(y_val)),
+        "total_rows": int(len(y)),
         "trained_at": artifact["trained_at"],
     }
     with METRICS_PATH.open("w", encoding="utf-8") as metrics_file:

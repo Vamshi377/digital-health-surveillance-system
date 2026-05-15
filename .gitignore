@@ -11,6 +11,8 @@ ml_service/.env
 node_modules/
 frontend/node_modules/
 frontend/dist/
+digital-health-frontend/node_modules/
+digital-health-frontend/dist/
 dist/
 coverage/
 npm-debug.log*
@@ -32,11 +34,14 @@ __pycache__/
 # ML generated artifacts
 ml_service/artifacts/*.joblib
 ml_service/artifacts/*.json
+ml_service/artifacts/*.html
+ml_service/artifacts/*.txt
 
 # Local database / data files
 data/*.db
 *.sqlite
 *.sqlite3
+uploads/
 
 # OS/editor files
 .DS_Store

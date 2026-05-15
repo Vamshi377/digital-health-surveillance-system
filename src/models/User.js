@@ -85,6 +85,15 @@ const userSchema = new Schema(
       type: Date,
       default: null
     },
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
+      default: null
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      default: null
+    },
     roleProfile: {
       registrationNumber: { type: String, trim: true, default: "" },
       qualification: { type: String, trim: true, default: "" },

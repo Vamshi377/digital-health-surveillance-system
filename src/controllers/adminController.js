@@ -5,6 +5,7 @@ const {
   listUsers,
   reviewUserApproval
 } = require("../services/adminService");
+const { listAuditLogs } = require("../services/auditService");
 
 async function createUserHandler(req, res, next) {
   try {
@@ -51,10 +52,20 @@ async function reviewUserApprovalHandler(req, res, next) {
   }
 }
 
+async function listAuditLogsHandler(req, res, next) {
+  try {
+    const logs = await listAuditLogs(req.query);
+    return res.status(200).json({ logs });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   createUserHandler,
   updateUserRoleHandler,
   updateUserStatusHandler,
   listUsersHandler,
-  reviewUserApprovalHandler
+  reviewUserApprovalHandler,
+  listAuditLogsHandler
 };

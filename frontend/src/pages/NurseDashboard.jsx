@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+ï»¿import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, ClipboardList, RefreshCw, Save } from 'lucide-react';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
@@ -16,7 +16,6 @@ const EMPTY_FORM = {
   bpDiastolic: '',
   pulse: '',
   spo2: '',
-  respiratoryRate: '',
   nurseNotes: ''
 };
 
@@ -85,8 +84,7 @@ export default function NurseDashboard() {
           bpSystolic: toNumberOrNull(form.bpSystolic),
           bpDiastolic: toNumberOrNull(form.bpDiastolic),
           pulse: toNumberOrNull(form.pulse),
-          spo2: toNumberOrNull(form.spo2),
-          respiratoryRate: toNumberOrNull(form.respiratoryRate)
+          spo2: toNumberOrNull(form.spo2)
         }
       });
       setMessage('Medical record saved successfully.');
@@ -102,7 +100,7 @@ export default function NurseDashboard() {
 
   return (
     <div className="page-enter">
-      <PageHeader title="Nursing Desk" subtitle="Capture vitals and create medical records for today’s queue" icon={Activity} actions={[<Button key="refresh" icon={RefreshCw} variant="secondary" onClick={loadQueue}>Refresh</Button>]} />
+      <PageHeader title="Nursing Desk" subtitle="Capture vitals and create medical records for todayâ€™s queue" icon={Activity} actions={[<Button key="refresh" icon={RefreshCw} variant="secondary" onClick={loadQueue}>Refresh</Button>]} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 18, marginBottom: 28 }}>
         <StatCard title="Queue Size" value={stats.total} gradient="stat-gradient-blue" icon={ClipboardList} sub="appointments awaiting triage" />
@@ -117,7 +115,7 @@ export default function NurseDashboard() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 22 }}>
-        <SectionCard title="Today’s Nurse Queue" subtitle="Select an appointment to record vitals">
+        <SectionCard title="Todayâ€™s Nurse Queue" subtitle="Select an appointment to record vitals">
           <DataTable columns={columns} data={queue} loading={loading} emptyMessage="No appointments in nurse queue" onRowClick={(row) => {
             setSelected(row);
             setMessage('');
@@ -135,7 +133,6 @@ export default function NurseDashboard() {
               <FormField label="BP Systolic"><Input type="number" value={form.bpSystolic} onChange={(event) => setForm((prev) => ({ ...prev, bpSystolic: event.target.value }))} /></FormField>
               <FormField label="BP Diastolic"><Input type="number" value={form.bpDiastolic} onChange={(event) => setForm((prev) => ({ ...prev, bpDiastolic: event.target.value }))} /></FormField>
               <FormField label="SpO2"><Input type="number" value={form.spo2} onChange={(event) => setForm((prev) => ({ ...prev, spo2: event.target.value }))} /></FormField>
-              <FormField label="Respiratory Rate"><Input type="number" value={form.respiratoryRate} onChange={(event) => setForm((prev) => ({ ...prev, respiratoryRate: event.target.value }))} /></FormField>
               <FormField label="Nurse Notes" style={{ gridColumn: '1 / -1' }}><Textarea value={form.nurseNotes} onChange={(event) => setForm((prev) => ({ ...prev, nurseNotes: event.target.value }))} /></FormField>
               <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
                 <Button icon={Save} loading={saving} onClick={handleSave}>Save Medical Record</Button>
@@ -149,4 +146,5 @@ export default function NurseDashboard() {
     </div>
   );
 }
+
 

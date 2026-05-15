@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CalendarDays, RefreshCw, Search, UserPlus, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import FormField, { Input, Select, Textarea } from '../components/ui/FormField';
@@ -28,6 +29,7 @@ const EMPTY_APPOINTMENT_FORM = {
 };
 
 export default function ReceptionDashboard() {
+  const location = useLocation();
   const [search, setSearch] = useState({ phone: '', aadharNumber: '' });
   const [registerForm, setRegisterForm] = useState(EMPTY_PATIENT_FORM);
   const [appointmentForm, setAppointmentForm] = useState(EMPTY_APPOINTMENT_FORM);
@@ -40,7 +42,8 @@ export default function ReceptionDashboard() {
 
   const searchReady = Number(Boolean(search.phone || search.aadharNumber));
   const patientFound = Number(Boolean(patient));
-  const bookingReady = Number(Boolean((appointmentForm.patientIdentifier || patient?.patientCode) && appointmentForm.scheduledAt));
+  const bookingReady = Number(Boolean((appointmentForm.patientIdentifier || patient?.hospitalPatientId || patient?.patientCode) && appointmentForm.scheduledAt));
+  const viewMode = location.pathname.includes('/reception/appointments') ? 'appointments' : 'patients';
 
   const resetFeedback = () => {
     setMessage('');
@@ -54,10 +57,10 @@ export default function ReceptionDashboard() {
       const data = await clinicalService.searchPatient(search);
       setPatient(data?.patient || null);
       if (data?.patient) {
-        setMessage(`Patient found: ${data.patient.fullName} (${data.patient.patientCode})`);
-        setAppointmentForm((prev) => ({ ...prev, patientIdentifier: data.patient.patientCode }));
+        setMessage(`Patient found: ${data.patient.fullName}. Hospital Patient ID: ${data.patient.hospitalPatientId || '-'}. Global Patient ID: ${data.patient.patientCode}`);
+        setAppointmentForm((prev) => ({ ...prev, patientIdentifier: data.patient.hospitalPatientId || data.patient.patientCode }));
       } else {
-        setMessage('No patient found for the entered phone or Aadhar number.');
+        setMessage('No patient found for the entered mobile number or Aadhaar number.');
       }
     } catch (err) {
       setError(err.message);
@@ -75,8 +78,8 @@ export default function ReceptionDashboard() {
       const createdPatient = data?.patient || null;
       setPatient(createdPatient);
       setRegisterForm(EMPTY_PATIENT_FORM);
-      setAppointmentForm((prev) => ({ ...prev, patientIdentifier: createdPatient?.patientCode || prev.patientIdentifier }));
-      setMessage(`Patient registered successfully with code ${createdPatient?.patientCode}.`);
+      setAppointmentForm((prev) => ({ ...prev, patientIdentifier: createdPatient?.hospitalPatientId || createdPatient?.patientCode || prev.patientIdentifier }));
+      setMessage(`Patient registered successfully. Hospital Patient ID: ${createdPatient?.hospitalPatientId || '-'}. Global Patient ID: ${createdPatient?.patientCode}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -88,14 +91,14 @@ export default function ReceptionDashboard() {
     resetFeedback();
     setSavingAppointment(true);
     try {
-      const patientIdentifier = appointmentForm.patientIdentifier || patient?.patientCode;
+      const patientIdentifier = appointmentForm.patientIdentifier || patient?.hospitalPatientId || patient?.patientCode;
       await clinicalService.createAppointment(patientIdentifier, {
         scheduledAt: appointmentForm.scheduledAt,
         visitDate: appointmentForm.visitDate || appointmentForm.scheduledAt,
         reason: appointmentForm.reason
       });
       setAppointmentForm(EMPTY_APPOINTMENT_FORM);
-      setMessage(`Appointment booked for ${patientIdentifier}.`);
+      setMessage(`Appointment booked for Hospital Patient ID ${patientIdentifier}.`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -125,13 +128,14 @@ export default function ReceptionDashboard() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22 }}>
-        <SectionCard title="Find Existing Patient" subtitle="Search by phone or Aadhar number">
+        {viewMode === 'patients' && (
+          <SectionCard title="Find Existing Patient" subtitle="Search by registered mobile number or Aadhaar number">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <FormField label="Phone Number">
               <Input value={search.phone} onChange={(event) => setSearch((prev) => ({ ...prev, phone: event.target.value }))} placeholder="10 digit phone" />
             </FormField>
-            <FormField label="Aadhar Number">
-              <Input value={search.aadharNumber} onChange={(event) => setSearch((prev) => ({ ...prev, aadharNumber: event.target.value }))} placeholder="12 digit Aadhar" />
+            <FormField label="Aadhaar Number">
+              <Input value={search.aadharNumber} onChange={(event) => setSearch((prev) => ({ ...prev, aadharNumber: event.target.value }))} placeholder="12 digit Aadhaar" />
             </FormField>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
               <Button icon={Search} loading={loadingSearch} onClick={handleSearch}>Search Patient</Button>
@@ -142,8 +146,10 @@ export default function ReceptionDashboard() {
             {patient ? (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: '0.86rem' }}>
                 <div><strong>Name:</strong> {patient.fullName}</div>
-                <div><strong>Code:</strong> {patient.patientCode}</div>
+                <div><strong>Global Patient ID:</strong> {patient.patientCode}</div>
+                <div><strong>Hospital Patient ID:</strong> {patient.hospitalPatientId || '-'}</div>
                 <div><strong>Phone:</strong> {patient.contactNumber}</div>
+                <div><strong>Aadhaar:</strong> {patient.aadharNumber || '-'}</div>
                 <div><strong>District:</strong> {patient.district}</div>
                 <div style={{ gridColumn: '1 / -1' }}><strong>Address:</strong> {patient.addressLine}</div>
               </div>
@@ -151,9 +157,11 @@ export default function ReceptionDashboard() {
               <div style={{ color: 'var(--neutral-500)', fontSize: '0.85rem' }}>No patient selected yet.</div>
             )}
           </div>
-        </SectionCard>
+          </SectionCard>
+        )}
 
-        <SectionCard title="Register New Patient" subtitle="Create a new patient profile">
+        {viewMode === 'patients' && (
+          <SectionCard title="Register New Patient" subtitle="Create a new patient profile">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <FormField label="Full Name" required><Input value={registerForm.fullName} onChange={(event) => setRegisterForm((prev) => ({ ...prev, fullName: event.target.value }))} /></FormField>
             <FormField label="Date of Birth" required><Input type="date" value={registerForm.dateOfBirth} onChange={(event) => setRegisterForm((prev) => ({ ...prev, dateOfBirth: event.target.value }))} /></FormField>
@@ -181,11 +189,22 @@ export default function ReceptionDashboard() {
               <Button icon={UserPlus} loading={savingPatient} onClick={handleRegister}>Register Patient</Button>
             </div>
           </div>
-        </SectionCard>
+          {patient && (
+            <div style={{ marginTop: 20, padding: '16px', background: 'var(--neutral-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--neutral-100)' }}>
+              <div style={{ fontSize: '0.86rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div><strong>Generated Global Patient ID:</strong> {patient.patientCode}</div>
+                <div><strong>Generated Hospital Patient ID:</strong> {patient.hospitalPatientId || '-'}</div>
+                <div><strong>Mobile:</strong> {patient.contactNumber}</div>
+                <div><strong>Name:</strong> {patient.fullName}</div>
+              </div>
+            </div>
+          )}
+          </SectionCard>
+        )}
 
-        <SectionCard title="Book Appointment" subtitle="Create a new appointment for an existing patient" style={{ gridColumn: '1 / -1' }}>
+        <SectionCard title="Book Appointment" subtitle="Create a new appointment for an existing patient" style={{ gridColumn: viewMode === 'appointments' ? '1 / -1' : '1 / -1' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
-            <FormField label="Patient Code / ID" required><Input value={appointmentForm.patientIdentifier || patient?.patientCode || ''} onChange={(event) => setAppointmentForm((prev) => ({ ...prev, patientIdentifier: event.target.value }))} placeholder="PAT-XXXX" /></FormField>
+            <FormField label="Hospital Patient ID" required><Input value={appointmentForm.patientIdentifier || patient?.hospitalPatientId || patient?.patientCode || ''} onChange={(event) => setAppointmentForm((prev) => ({ ...prev, patientIdentifier: event.target.value }))} placeholder="HOSP-PAT-XXXX" /></FormField>
             <FormField label="Scheduled At" required><Input type="datetime-local" value={appointmentForm.scheduledAt} onChange={(event) => setAppointmentForm((prev) => ({ ...prev, scheduledAt: event.target.value }))} /></FormField>
             <FormField label="Visit Date & Time"><Input type="datetime-local" value={appointmentForm.visitDate} onChange={(event) => setAppointmentForm((prev) => ({ ...prev, visitDate: event.target.value }))} /></FormField>
             <FormField label="Reason"><Input value={appointmentForm.reason} onChange={(event) => setAppointmentForm((prev) => ({ ...prev, reason: event.target.value }))} placeholder="Fever / checkup" /></FormField>

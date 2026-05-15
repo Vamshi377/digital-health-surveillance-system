@@ -1,27 +1,42 @@
-# Digital Health Record + ML Disease Surveillance
+# Digital Health Record and Disease Surveillance System
 
-Full-stack hospital workflow platform with severity prediction and DMO district surveillance for Telangana.
+This project combines hospital workflow automation, machine learning-based severity prediction, and district-level public health monitoring in one platform. It supports patient handling from reception to diagnosis, then turns confirmed clinical outcomes into analytics that can be viewed by a District Medical Officer (DMO).
 
-## Stack
-- Backend: Node.js, Express, MongoDB (Mongoose), JWT, RBAC
-- ML service: Python FastAPI + XGBoost
-- Frontend: React + Vite + Recharts + Leaflet
+## What the system does
 
-## Services
-- Node API: `http://localhost:4000`
-- ML API: `http://127.0.0.1:8000`
-- Frontend: `http://localhost:5173`
+- Registers patients and creates appointments at the reception desk.
+- Captures symptoms and vitals through the nursing workflow.
+- Records lab observations, abnormal markers, and optional report files.
+- Lets doctors review a unified patient summary, add diagnosis details, and issue prescriptions.
+- Sends structured clinical data to a FastAPI service for severity prediction.
+- Aggregates confirmed cases and predictions into DMO dashboards for district surveillance in Telangana.
 
-## Core Workflow
-1. Reception registers patient (duplicate phone prevention, unique `patientCode`).
-2. Reception creates appointment.
-3. Nurse records vitals/symptoms once per appointment.
-4. Lab uploads report values + optional file.
-5. Doctor opens unified patient summary, adds diagnosis + prescription table.
-6. Node calls ML service for severity prediction.
-7. DMO dashboard updates with district and severity analytics.
+## Technology stack
 
-## Roles
+- Backend: Node.js, Express, MongoDB, Mongoose, JWT, role-based access control
+- Frontend: React, Vite, Axios, Recharts
+- Mapping and analytics UI: Leaflet-compatible Telangana district data and dashboard visualizations
+- ML service: Python, FastAPI, scikit-learn, XGBoost, joblib
+
+## Main modules
+
+### Clinical workflow
+
+The clinical side of the project follows a staged hospital flow:
+
+1. Receptionist registers or searches for a patient.
+2. Receptionist creates an appointment.
+3. Nurse records symptoms, vitals, and notes.
+4. Lab technician adds test values and uploads supporting files if needed.
+5. Doctor reviews the full case summary, confirms the disease, and submits treatment.
+6. The backend calls the ML service and stores the predicted severity and risk score.
+
+### Surveillance workflow
+
+Once a diagnosis is completed, the case contributes to the DMO analytics layer. District and area metadata help the platform estimate disease burden, severity mix, hotspots, and trend signals across Telangana.
+
+## User roles
+
 - `receptionist`
 - `nurse`
 - `lab_technician`
@@ -31,43 +46,52 @@ Full-stack hospital workflow platform with severity prediction and DMO district 
 - `dmo`
 - `patient`
 
-## Security
-- bcrypt password hashing
-- JWT authentication
-- RBAC route guards
-- approval workflow with `PENDING`, `APPROVED`, `REJECTED`
-- schema/service validation
-- centralized error handling
-- audit logging (`AuditLog`) for key create/view actions
+Each role is restricted to its own dashboard and API permissions.
 
-## Project Structure
+## Security and validation highlights
+
+- Passwords are hashed with `bcryptjs`.
+- JWT tokens are used for authenticated API access.
+- Route protection is enforced with role-based access control.
+- New staff accounts can go through an approval workflow using `PENDING`, `APPROVED`, and `REJECTED`.
+- Duplicate patient registration by phone is prevented.
+- One medical record is allowed per appointment.
+- Validation is applied to vitals, uploaded reports, and core workflow transitions.
+- Audit logging is available for important actions.
+
+## Repository structure
+
 ```text
-src/
-  controllers/
-  routes/
-  models/
-  middlewares/
-  services/
-  utils/
-  config/
-ml_service/
-frontend/
+src/                         Node.js backend
+digital-health-frontend/     React frontend
+ml_service/                  FastAPI severity prediction service
+uploads/                     Uploaded lab files
+IMPLEMENTATION_RESULTS_DATA.md
+PROJECT_EXPLANATION_SCRIPT.md
 ```
+
+## Services and default local URLs
+
+- Backend API: `http://localhost:4000`
+- ML API: `http://127.0.0.1:8000`
+- Frontend: `http://localhost:5173`
 
 ## Setup
-### 1) Backend deps
+
+### 1. Install backend dependencies
+
 ```bash
 npm install
 ```
 
-### 2) Frontend deps
+### 2. Install frontend dependencies
+
 ```bash
-cd frontend
-npm install
-cd ..
+npm run frontend:install
 ```
 
-### 3) ML deps
+### 3. Install ML service dependencies
+
 ```bash
 cd ml_service
 py -3.10 -m venv .venv
@@ -77,51 +101,63 @@ python -m pip install -r requirements.txt
 cd ..
 ```
 
-## Environment
-Create root `.env` (example):
+## Environment configuration
+
+Create a root `.env` file. A working example is shown below:
+
 ```env
 PORT=4000
-MONGO_URI=<your_mongo_uri>
-JWT_SECRET=<strong_secret>
+JWT_SECRET=replace-with-a-strong-secret
 JWT_EXPIRES_IN=8h
+MONGO_URI=mongodb://127.0.0.1:27017/digital_health_records
 ML_SERVICE_URL=http://127.0.0.1:8000
+ML_SERVICE_API_KEY=
 FRONTEND_URL=http://localhost:5173
 ```
 
-## Run (3 terminals)
-### Terminal A - Backend
+The frontend also includes its own `.env.example` inside `digital-health-frontend/` if you need to override the API base URL for Vite.
+
+## Running the project
+
+Open three terminals.
+
+### Terminal 1: backend
+
 ```bash
 npm run dev
 ```
 
-### Terminal B - ML
+### Terminal 2: ML service
+
 ```bash
 cd ml_service
 .\.venv\Scripts\activate
-python train.py
-python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+python app.py
 ```
 
-### Terminal C - Frontend
+### Terminal 3: frontend
+
 ```bash
-cd frontend
-npm run dev
+npm run frontend:dev
 ```
 
-## Health Checks
-- Backend: `GET http://localhost:4000/health`
-- ML: `GET http://127.0.0.1:8000/health`
+## Health checks
 
-## Seed Data
-### Base users + basic records
+- Backend: `GET http://localhost:4000/health`
+- ML service: `GET http://127.0.0.1:8000/health`
+
+## Seed data and demo usage
+
+### Base seed
+
 ```bash
 npm run seed
 ```
 
-Important: the preset logins shown on the frontend login page work only after this seed step completes successfully.
-On a fresh clone, if MongoDB is not connected or `npm run seed` was not run, login will fail because demo users do not exist yet.
+This step is required if you want the preset login accounts to work. On a fresh clone, login will fail until MongoDB is connected and the seed script has created the demo users.
 
-Demo accounts created by `npm run seed`:
+### Demo accounts
+
 - `hospitaladmin@health.local` / `HospitalAdmin@123`
 - `reception@health.local` / `Reception@123`
 - `nurse@health.local` / `Nurse@123`
@@ -131,96 +167,200 @@ Demo accounts created by `npm run seed`:
 - `dmo@health.local` / `Dmo@123`
 - `patient@health.local` / `Patient@123`
 
-## Authentication Workflow
-- Single login page with `email`, `password`, and `role`
-- Staff registration page with common and role-specific fields
-- New staff registrations default to `PENDING`
-- Users cannot log in unless `approvalStatus === APPROVED`
-- Pending or rejected users see: `Your account is under verification`
+### Extra analytics demo data
 
-## Approval Rules
-- `doctor` -> approved by `medical_superintendent`
-- `nurse` -> approved by `medical_superintendent`
-- `lab_technician` -> approved by `medical_superintendent`
-- `receptionist` -> approved by `hospital_admin`
-- `medical_superintendent` -> approved by `dmo`
-- `hospital_admin` -> approved by `dmo`
-- `dmo` can be pre-created by seed/system
-
-### Extra DMO mock records for analytics demos
 ```bash
 npm run seed:dmo-mock
 ```
-This script now seeds patients/predictions across all Telangana districts from:
-`frontend/public/data/telanganaDistricts.json`
 
-## Key API Endpoints
-### Auth
+This adds mock prediction records across Telangana districts using the district map data in `digital-health-frontend/public/data/`.
+
+Additional helper scripts are also available:
+
+- `npm run seed:reception-mock`
+- `npm run seed:nurse-mock`
+- `npm run seed:doctor-mock`
+
+## Approval workflow
+
+The project includes role-specific account approval rules:
+
+- `doctor`, `nurse`, and `lab_technician` are approved by `medical_superintendent`
+- `receptionist` is approved by `hospital_admin`
+- `medical_superintendent` and `hospital_admin` are approved by `dmo`
+- `dmo` can be pre-created by the system or seed data
+
+Users who are pending or rejected should not be able to use the platform normally.
+
+## Key API areas
+
+### Authentication
+
 - `POST /api/auth/login`
 - `POST /api/auth/register`
 - `GET /api/auth/me`
 - `PATCH /api/admin/users/:userId/approval`
 
-### Clinical
-- `GET /api/clinical/patients/search-by-phone?phone=...` (reception/hospital_admin)
-- `POST /api/clinical/patients` (reception/hospital_admin)
-- `POST /api/clinical/patients/:patientId/appointments` (reception/hospital_admin)
-- `GET /api/clinical/nurse/queue` (nurse/hospital_admin)
-- `POST /api/clinical/appointments/:appointmentId/records` (nurse/hospital_admin)
-- `POST /api/clinical/records/:recordId/lab-reports` (lab/hospital_admin, multipart `reportImage` optional)
-- `GET /api/clinical/doctor/dashboard` (doctor/hospital_admin)
-- `GET /api/clinical/records/:recordId/summary` (doctor/hospital_admin)
-- `POST /api/clinical/records/:recordId/diagnosis` (doctor/hospital_admin)
+### Clinical workflow
+
+- `GET /api/clinical/patients/search?phone=...`
+- `POST /api/clinical/patients`
+- `POST /api/clinical/patients/:patientId/appointments`
+- `GET /api/clinical/nurse/queue`
+- `POST /api/clinical/appointments/:appointmentId/records`
+- `POST /api/clinical/records/:recordId/lab-reports`
+- `GET /api/clinical/doctor/dashboard`
+- `GET /api/clinical/records/:recordId/summary`
+- `POST /api/clinical/records/:recordId/diagnosis`
 - `GET /api/clinical/patients/:patientId/history`
 - `GET /api/clinical/patients/by-code/:patientCode/history`
-- `GET /api/clinical/patient/me/history` (patient)
+- `GET /api/clinical/patient/me/history`
 
-### DMO Analytics
+### DMO analytics
+
 - `GET /api/analytics/dmo/disease-burden`
 - `GET /api/analytics/dmo/overview`
 - `GET /api/analytics/dmo/patient-cluster?district=&area=&disease=&fromDate=&toDate=`
 
-## DMO Dashboard Features
-- Real-time auto refresh controls
-- Outbreak alert rules
-- Week-over-week trend
+## Frontend notes
+
+The React application lives in `digital-health-frontend/`. It includes role-based dashboards for login, reception, nursing, lab, doctor, patient, admin, and DMO use cases. API calls are centralized in `digital-health-frontend/src/services/api.js`, which makes backend integration easier to maintain.
+
+If the backend is unavailable, some screens may still render fallback or mock data to keep the UI demonstrable.
+
+## ML service summary
+
+The ML service is stored in `ml_service/` and predicts severity using structured clinical inputs. It also contains scripts for training, comparing models, and generating evaluation artifacts.
+
+### Core ML files
+
+- `ml_service/app.py`: FastAPI prediction service
+- `ml_service/train.py`: training script for the deployed model
+- `ml_service/compare_severity_models.py`: side-by-side evaluation
+- `ml_service/visualize_severity_results.py`: artifact generation for charts and summaries
+- `ml_service/data/severity_dataset.csv`: severity dataset
+- `ml_service/artifacts/`: saved models and metrics
+
+### ML input fields
+
+- `age`
+- `temperature`
+- `bp`
+- `lab_results`
+- `symptoms`
+- `disease_name`
+
+### ML output
+
+- `severity`
+- `risk_score`
+
+### Run model training
+
+```bash
+cd ml_service
+.\.venv\Scripts\activate
+python train.py
+```
+
+### Compare algorithms
+
+```bash
+cd ml_service
+.\.venv\Scripts\activate
+python compare_severity_models.py
+```
+
+### Generate evaluation visuals
+
+```bash
+cd ml_service
+.\.venv\Scripts\activate
+python visualize_severity_results.py
+```
+
+### Prediction endpoint
+
+`POST /predict`
+
+Example request:
+
+```json
+{
+  "age": 62,
+  "temperature": 101.4,
+  "bp": "158/96",
+  "lab_results": "wbc:high;troponin:borderline",
+  "symptoms": "chest_pain;breathlessness;fatigue",
+  "disease_name": "dengue"
+}
+```
+
+Example response:
+
+```json
+{
+  "risk_score": 0.82,
+  "severity": "High"
+}
+```
+
+## DMO dashboard features
+
+- District-level disease burden view
+- Severity distribution summaries
 - Hotspot ranking
-- District burden table
-- Telangana district choropleth (33 districts)
-- District hover tooltip and click popup: Active + low/moderate/high + priority
-- District click summary panel below map (updates on each district click)
-- Patient cluster modal for field action
-- No circle/radius overlays; district-boundary mapping only
-- Telangana-themed map background for readability behind district polygons
+- Week-over-week trend tracking
+- Outbreak alert indicators
+- Telangana district map interactions
+- Patient cluster drill-down for field review
+- Demo mode and live mode support
 
-## Telangana District Map Data
-Runtime files used by frontend:
-- `frontend/public/data/telanganaDistricts.json` (GeoJSON boundaries)
-- `frontend/public/data/telanganaDistrictMeta.json` (population/literacy metadata)
+Map assets are loaded from:
 
-If replacing map data, keep GeoJSON district property as one of:
-- `D_NAME`, `D_N`, `DISTRICT`, `district`, `dist_name`, `name`
+- `digital-health-frontend/public/data/telanganaDistricts.json`
+- `digital-health-frontend/public/data/telanganaDistrictMeta.json`
 
-## Notes
-- ML prediction triggers after doctor diagnosis only.
-- `MedicalRecord` is one-per-appointment (prevents duplicate nursing records).
-- Lab reports store abnormal markers and critical flags.
-- DMO view supports both live DB mode and demo mode.
-- If only one district shows data in Live mode, reseed demo analytics:
-  1. `npm run seed:dmo-mock`
-  2. refresh DMO dashboard
+If you replace the GeoJSON, keep district naming fields compatible with the frontend parser.
 
-## Login Troubleshooting For Fresh Clones
-1. Create the root `.env` with a valid `MONGO_URI`.
-2. Start MongoDB or use MongoDB Atlas.
-3. Run `npm install` in the root and `npm install` inside `frontend`.
-4. Run `npm run seed` in the project root.
-5. Start backend with `npm run dev`.
-6. Start ML service if you want prediction flow.
-7. Start frontend with `cd frontend` and `npm run dev`.
-8. Open `http://localhost:5173` and use one of the demo accounts above.
+## Troubleshooting
 
-If login still fails:
-- Check backend health at `http://localhost:4000/health`.
-- Check that the backend is using the same MongoDB database you seeded.
-- Check backend terminal logs for `Invalid credentials`, `Your account is under verification`, Mongo connection errors, or JWT/env errors.
+### Login fails on a fresh clone
+
+1. Make sure the root `.env` exists and contains a valid `MONGO_URI`.
+2. Confirm MongoDB is running or your Atlas connection string is correct.
+3. Run `npm install`.
+4. Run `npm run frontend:install`.
+5. Run `npm run seed`.
+6. Start the backend with `npm run dev`.
+7. Start the ML service if you want severity prediction.
+8. Start the frontend with `npm run frontend:dev`.
+
+### DMO dashboard looks empty in live mode
+
+If your real database has too few diagnosed cases, seed analytics data again:
+
+```bash
+npm run seed:dmo-mock
+```
+
+Then refresh the DMO dashboard.
+
+### Prediction is not appearing
+
+- Check that the ML service is running.
+- Verify `ML_SERVICE_URL` in the root `.env`.
+- Confirm the doctor diagnosis step completed successfully.
+
+## Supporting documentation
+
+These files are still useful for reports, demos, and viva preparation:
+
+- `IMPLEMENTATION_RESULTS_DATA.md` for model evaluation and screenshot notes
+- `PROJECT_EXPLANATION_SCRIPT.md` for a spoken project walkthrough
+- `ml_service/README.md` for ML-specific quick reference
+- `digital-health-frontend/README.md` for frontend-specific notes
+
+## Project summary
+
+This repository is designed as more than a standard hospital record app. It connects operational healthcare tasks with severity-aware analytics so that a diagnosed patient case can contribute both to treatment workflow and to district-level surveillance insights.

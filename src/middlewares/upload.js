@@ -29,7 +29,9 @@ const uploadLabReportImage = multer({
   },
   fileFilter: (req, file, cb) => {
     if (!allowedMimes.has(file.mimetype)) {
-      cb(new Error("Only png/jpg/jpeg/pdf files are allowed"));
+      const error = new Error("Only png/jpg/jpeg/pdf files are allowed");
+      error.statusCode = 400;
+      cb(error);
       return;
     }
     cb(null, true);

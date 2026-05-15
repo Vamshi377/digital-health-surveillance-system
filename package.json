@@ -6,7 +6,12 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
+    "frontend:install": "npm --prefix digital-health-frontend install",
+    "frontend:dev": "npm --prefix digital-health-frontend run dev",
+    "frontend:build": "npm --prefix digital-health-frontend run build",
     "seed": "node src/scripts/seedDemoData.js",
+    "seed:jagtial-map": "node src/scripts/seedJagtial20MapCases.js",
+    "cleanup:non-jagtial": "node src/scripts/cleanupNonJagtialAnalytics.js",
     "seed:dmo-mock": "node src/scripts/seedDmoMockData.js",
     "seed:reception-mock": "node src/scripts/seedReceptionMockData.js",
     "seed:nurse-mock": "node src/scripts/seedNurseMockData.js",

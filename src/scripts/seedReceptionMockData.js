@@ -2,6 +2,7 @@ const env = require("../config/env");
 const { connectDatabase } = require("../config/database");
 const { User } = require("../models/User");
 const { Patient } = require("../models/Patient");
+const { PatientHospitalIdentity } = require("../models/PatientHospitalIdentity");
 const { Appointment } = require("../models/Appointment");
 const { receptionCases } = require("./mockData/jagtialReceptionCases");
 
@@ -30,6 +31,29 @@ function buildScheduledAt(dateValue) {
 
 function buildVisitDate(dateValue) {
   return new Date(`${dateValue}T11:15:00.000Z`);
+}
+
+function buildHospitalPatientId(hospitalId, patientId) {
+  const prefix = String(hospitalId || "HOSP").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "HOSP";
+  return `${prefix}-PAT-${String(patientId).padStart(4, "0")}`;
+}
+
+async function ensureHospitalIdentity(patient, receptionist, seedKey) {
+  const hospitalId = String(receptionist?.hospitalId || "HOSP").trim() || "HOSP";
+  const hospitalName = String(receptionist?.hospitalName || "").trim();
+
+  const existing = await PatientHospitalIdentity.findOne({ patient: patient._id, hospitalId });
+  if (existing) {
+    return existing;
+  }
+
+  return PatientHospitalIdentity.create({
+    patient: patient._id,
+    hospitalId,
+    hospitalName,
+    hospitalPatientId: buildHospitalPatientId(hospitalId, seedKey),
+    createdBy: receptionist._id
+  });
 }
 
 async function run() {
@@ -75,6 +99,8 @@ async function run() {
       patient = await Patient.create(patientPayload);
     }
 
+    await ensureHospitalIdentity(patient, receptionist, entry.patientId);
+
     await Appointment.findOneAndUpdate(
       { patient: patient._id, scheduledAt: buildScheduledAt(entry.appointmentDate) },
       {
@@ -91,8 +117,74 @@ async function run() {
     );
   }
 
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  twoDaysAgo.setHours(10, 0, 0, 0);
+
+  const todayFollowUp = new Date();
+  todayFollowUp.setHours(14, 30, 0, 0);
+
+  let followUpPatient = await Patient.findOne({ aadharNumber: "991234567890" });
+  if (followUpPatient) {
+    followUpPatient.fullName = "Ramesh Followup";
+    followUpPatient.dateOfBirth = new Date("1990-05-14T00:00:00.000Z");
+    followUpPatient.age = 35;
+    followUpPatient.gender = "male";
+    followUpPatient.district = "Jagtial";
+    followUpPatient.mandal = "Jagtial";
+    followUpPatient.village = "Mothe";
+    followUpPatient.ward = null;
+    followUpPatient.area = "Mothe";
+    followUpPatient.addressLine = "Mothe, Jagtial, Jagtial";
+    followUpPatient.contactNumber = "9012345678";
+    followUpPatient.aadharNumber = "991234567890";
+    followUpPatient.registeredBy = receptionist._id;
+    await followUpPatient.save();
+    await Patient.updateOne({ _id: followUpPatient._id }, { $set: { createdAt: twoDaysAgo, updatedAt: todayFollowUp } });
+  } else {
+    followUpPatient = await Patient.create({
+      patientCode: "PAT-JGT-FUP001",
+      fullName: "Ramesh Followup",
+      dateOfBirth: new Date("1990-05-14T00:00:00.000Z"),
+      age: 35,
+      gender: "male",
+      district: "Jagtial",
+      mandal: "Jagtial",
+      village: "Mothe",
+      ward: null,
+      area: "Mothe",
+      addressLine: "Mothe, Jagtial, Jagtial",
+      contactNumber: "9012345678",
+      aadharNumber: "991234567890",
+      registeredBy: receptionist._id,
+      createdAt: twoDaysAgo,
+      updatedAt: todayFollowUp
+    });
+  }
+
+  await ensureHospitalIdentity(followUpPatient, receptionist, 9001);
+
+  await Appointment.findOneAndUpdate(
+    { patient: followUpPatient._id, scheduledAt: todayFollowUp },
+    {
+      $set: {
+        patient: followUpPatient._id,
+        scheduledAt: todayFollowUp,
+        visitDate: todayFollowUp,
+        reason: "Follow-up visit scheduled after registration two days ago",
+        createdBy: receptionist._id,
+        status: "scheduled",
+        updatedAt: todayFollowUp
+      },
+      $setOnInsert: {
+        createdAt: todayFollowUp
+      }
+    },
+    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+  );
+
   console.log(`Reception mock data seeded successfully on ${env.mongoUri}`);
-  console.log(`Patients seeded: ${receptionCases.length}`);
+  console.log(`Patients seeded: ${receptionCases.length + 1}`);
   process.exit(0);
 }
 

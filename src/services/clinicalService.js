@@ -1,4 +1,5 @@
 const { Patient } = require("../models/Patient");
+const { PatientHospitalIdentity } = require("../models/PatientHospitalIdentity");
 const { Appointment } = require("../models/Appointment");
 const { MedicalRecord } = require("../models/MedicalRecord");
 const { LabReport } = require("../models/LabReport");
@@ -6,8 +7,10 @@ const { Diagnosis } = require("../models/Diagnosis");
 const { Prescription } = require("../models/Prescription");
 const { Prediction } = require("../models/Prediction");
 const { Notification } = require("../models/Notification");
+const { DietPlan } = require("../models/DietPlan");
 const { User } = require("../models/User");
 const { predictSeverity } = require("./mlService");
+const { generateAndSaveDietPlan } = require("./dietService");
 const { createHttpError } = require("../utils/httpError");
 const { logAudit } = require("./auditService");
 
@@ -23,7 +26,45 @@ function isObjectId(value) {
   return /^[0-9a-fA-F]{24}$/.test(String(value || ""));
 }
 
-async function findPatientByIdentifier(identifier) {
+function buildHospitalPatientId(hospitalId) {
+  const prefix = String(hospitalId || "HOSP").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "HOSP";
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${prefix}-PAT-${random}`;
+}
+
+async function ensureHospitalIdentity(patientId, actor) {
+  const hospitalId = String(actor?.hospitalId || "HOSP").trim() || "HOSP";
+  const hospitalName = String(actor?.hospitalName || "").trim();
+
+  let identity = await PatientHospitalIdentity.findOne({ patient: patientId, hospitalId }).lean();
+  if (identity) {
+    return identity;
+  }
+
+  let created = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      created = await PatientHospitalIdentity.create({
+        patient: patientId,
+        hospitalId,
+        hospitalName,
+        hospitalPatientId: buildHospitalPatientId(hospitalId),
+        createdBy: actor?._id || actor?.id || null
+      });
+      break;
+    } catch (error) {
+      if (error?.code !== 11000) throw error;
+    }
+  }
+
+  if (!created) {
+    throw createHttpError(500, "Unable to generate hospital patient ID");
+  }
+
+  return created.toObject();
+}
+
+async function findPatientByIdentifier(identifier, actor = null) {
   const normalized = String(identifier || "").trim();
   if (!normalized) {
     throw createHttpError(400, "Patient identifier is required");
@@ -39,6 +80,21 @@ async function findPatientByIdentifier(identifier) {
   const patientByCode = await Patient.findOne({ patientCode: normalized.toUpperCase() }).lean();
   if (patientByCode) {
     return patientByCode;
+  }
+
+  const hospitalId = String(actor?.hospitalId || "").trim();
+  if (hospitalId) {
+    const identity = await PatientHospitalIdentity.findOne({
+      hospitalId,
+      hospitalPatientId: normalized.toUpperCase()
+    }).lean();
+
+    if (identity) {
+      const patientByHospitalId = await Patient.findById(identity.patient).lean();
+      if (patientByHospitalId) {
+        return patientByHospitalId;
+      }
+    }
   }
 
   throw createHttpError(404, "Patient not found");
@@ -173,7 +229,7 @@ function buildRiskInsight(predictions) {
   };
 }
 
-async function searchPatient(phone, aadharNumber) {
+async function searchPatient(phone, aadharNumber, actorId = null) {
   const normalizedPhone = phone ? String(phone).trim() : "";
   const normalizedAadhar = aadharNumber ? String(aadharNumber).trim() : "";
 
@@ -187,7 +243,23 @@ async function searchPatient(phone, aadharNumber) {
       ...(normalizedAadhar ? [{ aadharNumber: normalizedAadhar }] : [])
     ]
   }).lean();
-  return patient;
+  if (!patient) {
+    return null;
+  }
+
+  let hospitalIdentity = null;
+  if (actorId) {
+    const actor = await User.findById(actorId).lean();
+    if (actor) {
+      hospitalIdentity = await ensureHospitalIdentity(patient._id, actor);
+    }
+  }
+
+  return {
+    ...patient,
+    hospitalIdentity,
+    hospitalPatientId: hospitalIdentity?.hospitalPatientId || null
+  };
 }
 
 async function registerPatient(payload, actorId) {
@@ -242,27 +314,138 @@ async function registerPatient(payload, actorId) {
   if (!/^\d{10}$/.test(normalizedPhone)) {
     throw createHttpError(400, "Contact number must be exactly 10 digits");
   }
-  const existingByPhone = await Patient.findOne({ contactNumber: normalizedPhone }).lean();
-  if (existingByPhone) {
-    throw createHttpError(
-      409,
-      `Phone already exists with patientCode ${existingByPhone.patientCode}`
-    );
-  }
-
   const normalizedAadhar = String(aadharNumber || "").trim();
   if (!/^\d{12}$/.test(normalizedAadhar)) {
     throw createHttpError(400, "Aadhar number must be exactly 12 digits");
   }
-  const existingByAadhar = await Patient.findOne({ aadharNumber: normalizedAadhar }).lean();
-  if (existingByAadhar) {
+
+  let patient = await Patient.findOne({
+    $or: [{ contactNumber: normalizedPhone }, { aadharNumber: normalizedAadhar }]
+  });
+
+  if (patient) {
+    patient.fullName = String(fullName).trim();
+    patient.dateOfBirth = parsedDob;
+    patient.age = derivedAge;
+    patient.gender = String(gender).toLowerCase().trim();
+    patient.district = String(resolvedCity).trim();
+    patient.mandal = resolvedMandal;
+    patient.village = resolvedVillage || null;
+    patient.ward = resolvedWard || null;
+    patient.area = resolvedLocality;
+    patient.addressLine = String(addressLine || `${resolvedLocality}, ${resolvedMandal}, ${String(resolvedCity).trim()}`).trim();
+    patient.contactNumber = normalizedPhone;
+    patient.aadharNumber = normalizedAadhar;
+    patient.location = {
+      lat: location?.lat ?? null,
+      lng: location?.lng ?? null
+    };
+    await patient.save();
+  } else {
+    patient = await Patient.create({
+      fullName: String(fullName).trim(),
+      dateOfBirth: parsedDob,
+      age: derivedAge,
+      gender: String(gender).toLowerCase().trim(),
+      district: String(resolvedCity).trim(),
+      mandal: resolvedMandal,
+      village: resolvedVillage || null,
+      ward: resolvedWard || null,
+      area: resolvedLocality,
+      addressLine: String(addressLine || `${resolvedLocality}, ${resolvedMandal}, ${String(resolvedCity).trim()}`).trim(),
+      contactNumber: normalizedPhone,
+      aadharNumber: normalizedAadhar,
+      location: {
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null
+      },
+      registeredBy: actorId
+    });
+  }
+
+  const actor = await User.findById(actorId).lean();
+  const hospitalIdentity = actor ? await ensureHospitalIdentity(patient._id, actor) : null;
+
+  await logAudit({
+    actorId,
+    action: "CREATE_PATIENT",
+    entityType: "Patient",
+    entityId: patient._id,
+    details: { patientCode: patient.patientCode, hospitalPatientId: hospitalIdentity?.hospitalPatientId || null }
+  });
+
+  return {
+    ...patient.toObject(),
+    hospitalIdentity,
+    hospitalPatientId: hospitalIdentity?.hospitalPatientId || null
+  };
+}
+
+async function selfRegisterPatient(payload) {
+  const {
+    fullName,
+    age,
+    dateOfBirth,
+    gender,
+    district,
+    city,
+    mandal,
+    village,
+    ward,
+    area,
+    addressLine,
+    contactNumber,
+    aadharNumber
+  } = payload;
+
+  const resolvedCity = city || district;
+  const resolvedMandal = String(mandal || area || "").trim();
+  const resolvedVillage = String(village || "").trim();
+  const resolvedWard = String(ward || "").trim();
+  const resolvedLocality = resolvedVillage || resolvedWard || String(area || "").trim();
+
+  if (!fullName || !gender || !resolvedCity || !resolvedMandal || !resolvedLocality || !contactNumber || !aadharNumber) {
     throw createHttpError(
-      409,
-      `Aadhar already exists with patientCode ${existingByAadhar.patientCode}`
+      400,
+      "fullName, gender, city/district, mandal, village or ward, contactNumber, aadharNumber are required"
     );
   }
 
-  const patient = await Patient.create({
+  let derivedAge = Number(age);
+  let parsedDob = null;
+  if (dateOfBirth) {
+    parsedDob = new Date(dateOfBirth);
+    if (Number.isNaN(parsedDob.getTime())) {
+      throw createHttpError(400, "Invalid dateOfBirth");
+    }
+    derivedAge = calculateAgeFromDob(parsedDob);
+  }
+
+  if (Number.isNaN(derivedAge) || derivedAge < 0 || derivedAge > 130) {
+    throw createHttpError(400, "Valid age or dateOfBirth is required");
+  }
+
+  const normalizedPhone = String(contactNumber || "").trim();
+  const normalizedAadhar = String(aadharNumber || "").trim();
+  if (!/^\d{10}$/.test(normalizedPhone)) {
+    throw createHttpError(400, "Contact number must be exactly 10 digits");
+  }
+  if (!/^\d{12}$/.test(normalizedAadhar)) {
+    throw createHttpError(400, "Aadhar number must be exactly 12 digits");
+  }
+
+  let patient = await Patient.findOne({
+    $or: [{ contactNumber: normalizedPhone }, { aadharNumber: normalizedAadhar }]
+  });
+
+  if (patient) {
+    return {
+      patient,
+      alreadyExists: true
+    };
+  }
+
+  patient = await Patient.create({
     fullName: String(fullName).trim(),
     dateOfBirth: parsedDob,
     age: derivedAge,
@@ -275,22 +458,13 @@ async function registerPatient(payload, actorId) {
     addressLine: String(addressLine || `${resolvedLocality}, ${resolvedMandal}, ${String(resolvedCity).trim()}`).trim(),
     contactNumber: normalizedPhone,
     aadharNumber: normalizedAadhar,
-    location: {
-      lat: location?.lat ?? null,
-      lng: location?.lng ?? null
-    },
-    registeredBy: actorId
+    registeredBy: null
   });
 
-  await logAudit({
-    actorId,
-    action: "CREATE_PATIENT",
-    entityType: "Patient",
-    entityId: patient._id,
-    details: { patientCode: patient.patientCode }
-  });
-
-  return patient;
+  return {
+    patient,
+    alreadyExists: false
+  };
 }
 
 async function createAppointment(patientIdentifier, payload, actorId) {
@@ -309,7 +483,9 @@ async function createAppointment(patientIdentifier, payload, actorId) {
     throw createHttpError(400, "Invalid visitDate datetime");
   }
 
-  const patient = await findPatientByIdentifier(patientIdentifier);
+  const actor = await User.findById(actorId).lean();
+  const patient = await findPatientByIdentifier(patientIdentifier, actor);
+  const hospitalIdentity = actor ? await ensureHospitalIdentity(patient._id, actor) : null;
   const appointment = await Appointment.create({
     patient: patient._id,
     scheduledAt: date,
@@ -323,10 +499,18 @@ async function createAppointment(patientIdentifier, payload, actorId) {
     action: "CREATE_APPOINTMENT",
     entityType: "Appointment",
     entityId: appointment._id,
-    details: { patient: appointment.patient, scheduledAt: appointment.scheduledAt }
+    details: {
+      patient: appointment.patient,
+      scheduledAt: appointment.scheduledAt,
+      patientCode: patient.patientCode,
+      hospitalPatientId: hospitalIdentity?.hospitalPatientId || null
+    }
   });
 
-  return appointment;
+  return {
+    ...appointment.toObject(),
+    hospitalIdentity
+  };
 }
 
 async function getNurseQueue() {
@@ -373,6 +557,8 @@ async function createMedicalRecord(appointmentId, payload, actorId) {
   }
 
   const vitalsAlertLevel = calculateVitalsAlert(vitals);
+  const actor = await User.findById(actorId).lean();
+  const hospitalIdentity = await ensureHospitalIdentity(appointment.patient, actor);
 
   const record = await MedicalRecord.create({
     patient: appointment.patient,
@@ -401,10 +587,13 @@ async function createMedicalRecord(appointmentId, payload, actorId) {
     action: "CREATE_MEDICAL_RECORD",
     entityType: "MedicalRecord",
     entityId: record._id,
-    details: { appointmentId, vitalsAlertLevel }
+    details: { appointmentId, vitalsAlertLevel, hospitalPatientId: hospitalIdentity.hospitalPatientId }
   });
 
-  return record;
+  return {
+    ...record.toObject(),
+    hospitalIdentity
+  };
 }
 
 async function getLabQueue() {
@@ -449,6 +638,15 @@ async function uploadLabReport(recordId, payload, actorId, fileInfo) {
     entityType: "LabReport",
     entityId: report._id,
     details: { testName: report.testName, isCritical: report.isCritical }
+  });
+
+  await Notification.create({
+    patient: record.patient,
+    medicalRecord: recordId,
+    category: "lab_report",
+    title: "Lab report uploaded",
+    message: `${report.testName} report is now available${report.isCritical ? " and needs urgent doctor review" : ""}.`,
+    createdBy: actorId
   });
 
   return report;
@@ -526,7 +724,17 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
     disease_name: diagnosis.diseaseName
   };
 
-  const mlPrediction = await predictSeverity(mlPayload);
+  let mlPredictionError = null;
+  let mlPrediction;
+  try {
+    mlPrediction = await predictSeverity(mlPayload);
+  } catch (error) {
+    mlPredictionError = error.message || "ML severity prediction failed";
+    mlPrediction = {
+      probability: doctorSeverity ? 0.5 : 0,
+      predictedSeverity: doctorSeverity ? String(doctorSeverity).toLowerCase().trim() : "moderate"
+    };
+  }
 
   const prediction = await Prediction.create({
     patient: patient._id,
@@ -534,9 +742,25 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
     diseaseName: diagnosis.diseaseName,
     probability: mlPrediction.probability,
     predictedSeverity: mlPrediction.predictedSeverity,
-    modelSource: "fastapi-ml-service",
+    modelSource: mlPredictionError ? "fallback-after-ml-error" : "fastapi-ml-service",
     features: mlPayload
   });
+
+  let dietPlan = null;
+  let dietPlanError = null;
+  try {
+    dietPlan = await generateAndSaveDietPlan({
+      patient,
+      record,
+      diagnosis,
+      prescription: createdPrescription,
+      prediction,
+      labReports: latestLabReports,
+      actorId
+    });
+  } catch (error) {
+    dietPlanError = error.message || "Diet plan generation failed";
+  }
 
   await MedicalRecord.updateOne({ _id: recordId }, { $set: { status: "diagnosed" } });
   await Appointment.updateOne({ _id: record.appointment }, { $set: { status: "diagnosed" } });
@@ -546,18 +770,27 @@ async function createDiagnosisWithPrediction(recordId, payload, actorId) {
     action: "CREATE_DIAGNOSIS",
     entityType: "Diagnosis",
     entityId: diagnosis._id,
-    details: { diseaseName: diagnosis.diseaseName, predictedSeverity: prediction.predictedSeverity }
+    details: {
+      diseaseName: diagnosis.diseaseName,
+      predictedSeverity: prediction.predictedSeverity,
+      mlPredictionError,
+      dietPlanGenerated: Boolean(dietPlan),
+      dietPlanError
+    }
   });
 
   return {
     diagnosis,
     prescription: createdPrescription,
-    prediction
+    prediction,
+    mlPredictionError,
+    dietPlan,
+    dietPlanError
   };
 }
 
 async function getDoctorDashboard() {
-  const records = await MedicalRecord.find({ status: { $in: ["in_review", "diagnosed"] } })
+  const records = await MedicalRecord.find({ status: "in_review" })
     .populate("patient", "patientCode fullName age gender district mandal village ward area")
     .sort({ createdAt: -1 })
     .lean();
@@ -566,14 +799,15 @@ async function getDoctorDashboard() {
 }
 
 async function getPatientHistory(patientId, actorId) {
-  const [patient, medicalRecords, labReports, diagnoses, prescriptions, predictions, notifications] = await Promise.all([
+  const [patient, medicalRecords, labReports, diagnoses, prescriptions, predictions, notifications, dietPlans] = await Promise.all([
     Patient.findById(patientId).lean(),
     MedicalRecord.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     LabReport.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     Diagnosis.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     Prescription.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
     Prediction.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
-    Notification.find({ patient: patientId }).sort({ createdAt: -1 }).lean()
+    Notification.find({ patient: patientId }).sort({ createdAt: -1 }).lean(),
+    DietPlan.find({ patient: patientId }).sort({ createdAt: -1 }).lean()
   ]);
 
   if (!patient) {
@@ -617,6 +851,7 @@ async function getPatientHistory(patientId, actorId) {
     diagnoses,
     prescriptions,
     predictions,
+    dietPlans,
     notifications: [...notifications, ...derivedFollowUpNotifications].sort(
       (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
     )
@@ -631,13 +866,14 @@ async function getRecordSummary(recordId, actorId) {
     throw createHttpError(404, "Medical record not found");
   }
 
-  const [labReports, diagnoses, prescriptions, predictions, medicalRecords, notifications] = await Promise.all([
+  const [labReports, diagnoses, prescriptions, predictions, medicalRecords, notifications, dietPlans] = await Promise.all([
     LabReport.find({ medicalRecord: recordId }).sort({ createdAt: -1 }).lean(),
     Diagnosis.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
     Prescription.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
     Prediction.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
     MedicalRecord.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
-    Notification.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean()
+    Notification.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean(),
+    DietPlan.find({ patient: record.patient._id }).sort({ createdAt: -1 }).lean()
   ]);
 
   await logAudit({
@@ -657,6 +893,7 @@ async function getRecordSummary(recordId, actorId) {
     predictionHistory: predictions,
     visitHistory: medicalRecords.filter((item) => String(item._id) !== String(recordId)),
     notifications,
+    dietPlans,
     riskInsight: buildRiskInsight(predictions)
   };
 }
@@ -669,13 +906,77 @@ async function getPatientHistoryByCode(patientCode, actorId) {
   return getPatientHistory(patient._id, actorId);
 }
 
-async function getMyPatientHistory(userId, actorId) {
-  const user = await User.findById(userId).lean();
+async function getMyPatientHistory(patientOrUserId, actorId) {
+  const patient = await Patient.findById(patientOrUserId).lean();
+  if (patient) {
+    return getPatientHistory(patient._id, actorId);
+  }
+
+  const user = await User.findById(patientOrUserId).lean();
   if (!user || !user.patientId) {
     throw createHttpError(404, "Patient profile not linked to this account");
   }
 
   return getPatientHistory(user.patientId, actorId);
+}
+
+async function getMyNotifications(patientOrUserId) {
+  const patient = await Patient.findById(patientOrUserId).lean();
+  let patientId = patient?._id || null;
+
+  if (!patientId) {
+    const user = await User.findById(patientOrUserId).lean();
+    patientId = user?.patientId || null;
+  }
+
+  if (!patientId) {
+    throw createHttpError(404, "Patient profile not linked to this account");
+  }
+
+  return Notification.find({ patient: patientId }).sort({ createdAt: -1 }).limit(50).lean();
+}
+
+function csvCell(value) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function toCsv(headers, rows) {
+  return [
+    headers.map(csvCell).join(","),
+    ...rows.map((row) => headers.map((key) => csvCell(row[key])).join(","))
+  ].join("\n");
+}
+
+async function exportMyPatientHistoryCsv(patientOrUserId, actorId) {
+  const history = await getMyPatientHistory(patientOrUserId, actorId);
+  const rows = history.medicalRecords.map((record) => {
+    const diagnosis = history.diagnoses.find((item) => String(item.medicalRecord) === String(record._id));
+    const prediction = diagnosis
+      ? history.predictions.find((item) => String(item.diagnosis) === String(diagnosis._id))
+      : null;
+    const prescription = diagnosis
+      ? history.prescriptions.find((item) => String(item.diagnosis) === String(diagnosis._id))
+      : null;
+
+    return {
+      patientCode: history.patient.patientCode,
+      patientName: history.patient.fullName,
+      visitDate: record.appointmentAt ? new Date(record.appointmentAt).toISOString().slice(0, 10) : "",
+      status: record.status || "",
+      symptoms: (record.symptoms || []).join("; "),
+      diseaseName: diagnosis?.diseaseName || "",
+      doctorSeverity: diagnosis?.doctorSeverity || "",
+      predictedSeverity: prediction?.predictedSeverity || "",
+      probability: prediction?.probability ?? "",
+      prescription: (prescription?.medicines || []).map((item) => item.medicineName).join("; ")
+    };
+  });
+
+  return toCsv(
+    ["patientCode", "patientName", "visitDate", "status", "symptoms", "diseaseName", "doctorSeverity", "predictedSeverity", "probability", "prescription"],
+    rows
+  );
 }
 
 module.exports = {
@@ -691,5 +992,8 @@ module.exports = {
   getPatientHistory,
   getPatientHistoryByCode,
   getMyPatientHistory,
-  getRecordSummary
+  getRecordSummary,
+  selfRegisterPatient,
+  getMyNotifications,
+  exportMyPatientHistoryCsv
 };

@@ -30,6 +30,7 @@ http.interceptors.response.use(
 
 export const authService = {
   login: (credentials) => http.post('/api/auth/login', credentials),
+  registerPatientIdentity: (payload) => http.post('/api/auth/patient/register', payload),
   getMe: () => http.get('/api/auth/me')
 };
 

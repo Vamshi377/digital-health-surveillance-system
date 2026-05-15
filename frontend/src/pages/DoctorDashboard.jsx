@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlaskConical, RefreshCw, Save, Stethoscope, Users } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { FlaskConical, RefreshCw, Save, Search, Stethoscope, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import DataTable from '../components/ui/DataTable';
 import FormField, { Input, Select, Textarea } from '../components/ui/FormField';
@@ -17,6 +18,7 @@ function formatDateTime(value) {
 }
 
 export default function DoctorDashboard() {
+  const location = useLocation();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecordId, setSelectedRecordId] = useState('');
@@ -33,6 +35,8 @@ export default function DoctorDashboard() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [historyFilter, setHistoryFilter] = useState('diagnosed');
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -78,6 +82,27 @@ export default function DoctorDashboard() {
     diagnosed: records.filter((item) => item.status === 'diagnosed').length
   }), [records]);
 
+  const filteredRecords = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return records;
+    return records.filter((item) => {
+      const patientName = item.patient?.fullName?.toLowerCase() || '';
+      const patientCode = item.patient?.patientCode?.toLowerCase() || '';
+      return patientName.includes(query) || patientCode.includes(query);
+    });
+  }, [records, searchTerm]);
+
+  const reviewQueue = useMemo(
+    () => filteredRecords.filter((item) => item.status === 'in_review'),
+    [filteredRecords]
+  );
+
+  const completedCases = useMemo(() => {
+    const base = filteredRecords.filter((item) => item.status !== 'in_review');
+    if (historyFilter === 'all') return base;
+    return base.filter((item) => item.status === historyFilter);
+  }, [filteredRecords, historyFilter]);
+
   const columns = [
     { key: 'patientName', label: 'Patient', render: (_, row) => row.patient?.fullName || '-' },
     { key: 'patientCode', label: 'Patient Code', render: (_, row) => row.patient?.patientCode || '-' },
@@ -114,6 +139,11 @@ export default function DoctorDashboard() {
 
   const addMedicine = () => setForm((prev) => ({ ...prev, medicines: [...prev.medicines, emptyMedicine()] }));
   const removeMedicine = (index) => setForm((prev) => ({ ...prev, medicines: prev.medicines.filter((_, itemIndex) => itemIndex !== index) }));
+  const viewMode = location.pathname.includes('/doctor/patients')
+    ? 'patients'
+    : location.pathname.includes('/doctor/diagnosis')
+      ? 'review'
+      : 'overview';
 
   const handleSubmit = async () => {
     if (!selectedRecordId) return;
@@ -165,6 +195,24 @@ export default function DoctorDashboard() {
         <StatCard title="Diagnosed" value={stats.diagnosed} gradient="stat-gradient-teal" icon={FlaskConical} sub="completed cases" />
       </div>
 
+      <SectionCard
+        title="Doctor Filters"
+        subtitle="Search by patient name or patient ID and keep the queue focused on active work"
+        style={{ marginBottom: 22 }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+          <FormField label="Search">
+            <Input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search patient name or patient ID" />
+          </FormField>
+          <FormField label="Completed Cases">
+            <Select value={historyFilter} onChange={(event) => setHistoryFilter(event.target.value)}>
+              <option value="diagnosed">Diagnosed only</option>
+              <option value="all">All completed statuses</option>
+            </Select>
+          </FormField>
+        </div>
+      </SectionCard>
+
       {(message || error) && (
         <div className="card" style={{ padding: '14px 18px', marginBottom: 18, borderColor: error ? 'rgba(239,68,68,0.3)' : 'var(--neutral-100)' }}>
           <div style={{ color: error ? 'var(--danger-700)' : 'var(--success-700)', fontWeight: 600, fontSize: '0.88rem' }}>{error || message}</div>
@@ -172,15 +220,18 @@ export default function DoctorDashboard() {
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 22 }}>
-        <SectionCard title="Patient Review Queue" subtitle="Open a record to inspect full summary">
-          <DataTable columns={columns} data={records} loading={loading} emptyMessage="No doctor records available" onRowClick={(row) => {
+        {(viewMode === 'overview' || viewMode === 'patients') && (
+          <SectionCard title="Patient Review Queue" subtitle="Only active in-review cases are shown here" bodyStyle={{ maxHeight: 440, overflowY: 'auto' }}>
+          <DataTable columns={columns} data={reviewQueue} loading={loading} emptyMessage="No active review cases available" onRowClick={(row) => {
             setSelectedRecordId(row._id);
             setMessage('');
             setError('');
           }} />
-        </SectionCard>
+          </SectionCard>
+        )}
 
-        <SectionCard title="Record Summary" subtitle={summary?.record?.patient?.fullName || 'Select a record'}>
+        {(viewMode === 'overview' || viewMode === 'patients') && (
+          <SectionCard title="Record Summary" subtitle={summary?.record?.patient?.fullName || 'Select a record'}>
           {loadingSummary ? (
             <div style={{ color: 'var(--neutral-500)', fontSize: '0.85rem' }}>Loading summary...</div>
           ) : summary ? (
@@ -200,22 +251,33 @@ export default function DoctorDashboard() {
           ) : (
             <div style={{ color: 'var(--neutral-500)', fontSize: '0.85rem' }}>Choose a queue item to see the full patient summary.</div>
           )}
-        </SectionCard>
+          </SectionCard>
+        )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, marginTop: 22 }}>
-        <SectionCard title="Previous Visits" subtitle="Earlier vitals and complaints for this patient">
+      {(viewMode === 'overview' || viewMode === 'patients') && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 22, marginTop: 22 }}>
+          <SectionCard title="Previous Visits" subtitle="Earlier vitals and complaints for this patient">
           <DataTable columns={visitHistoryColumns} data={summary?.visitHistory || []} loading={loadingSummary} emptyMessage="No previous visits available" />
-        </SectionCard>
-        <SectionCard title="Previous Diagnoses" subtitle="Helps a new doctor understand past treatment">
+          </SectionCard>
+          <SectionCard title="Previous Diagnoses" subtitle="Helps a new doctor understand past treatment">
           <DataTable columns={diagnosisColumns} data={summary?.diagnosisHistory || []} loading={loadingSummary} emptyMessage="No diagnosis history available" />
-        </SectionCard>
-        <SectionCard title="Follow-up Notifications" subtitle="Existing reminders for continuity of care">
+          </SectionCard>
+          <SectionCard title="Follow-up Notifications" subtitle="Existing reminders for continuity of care">
           <DataTable columns={followUpColumns} data={(summary?.notifications || []).filter((item) => item.category === 'follow_up')} loading={loadingSummary} emptyMessage="No follow-up notifications available" />
-        </SectionCard>
-      </div>
+          </SectionCard>
+          <SectionCard title="Completed Cases" subtitle="Diagnosed records are moved here so the main queue stays short" bodyStyle={{ maxHeight: 440, overflowY: 'auto' }}>
+          <DataTable columns={columns} data={completedCases} loading={loading} emptyMessage="No completed cases found for the current filter" onRowClick={(row) => {
+            setSelectedRecordId(row._id);
+            setMessage('');
+            setError('');
+          }} />
+          </SectionCard>
+        </div>
+      )}
 
-      <SectionCard title="Submit Diagnosis" subtitle="Save medicines and follow-up. Leave disease blank to reuse the patient's latest diagnosis on follow-up visits." style={{ marginTop: 22 }}>
+      {(viewMode === 'overview' || viewMode === 'review') && (
+        <SectionCard title="Submit Diagnosis" subtitle="Save medicines and follow-up. Leave disease blank to reuse the patient's latest diagnosis on follow-up visits." style={{ marginTop: 22 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <FormField label="Disease Name"><Input value={form.diseaseName} placeholder="Optional for follow-up visits" onChange={(event) => setForm((prev) => ({ ...prev, diseaseName: event.target.value }))} /></FormField>
           <FormField label="Doctor Severity"><Select value={form.doctorSeverity} onChange={(event) => setForm((prev) => ({ ...prev, doctorSeverity: event.target.value }))}><option value="">Not recorded</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></Select></FormField>
@@ -241,7 +303,8 @@ export default function DoctorDashboard() {
             <Button icon={Save} loading={saving} onClick={handleSubmit}>Submit Diagnosis</Button>
           </div>
         </div>
-      </SectionCard>
+        </SectionCard>
+      )}
     </div>
   );
 }

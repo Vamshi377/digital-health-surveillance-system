@@ -15,7 +15,9 @@ const {
   recordSummaryHandler,
   patientHistoryHandler,
   patientHistoryByCodeHandler,
-  myRecordsHandler
+  myRecordsHandler,
+  myNotificationsHandler,
+  exportMyHistoryHandler
 } = require("../controllers/clinicalController");
 
 const router = express.Router();
@@ -49,5 +51,7 @@ router.get(
   patientHistoryByCodeHandler
 );
 router.get("/patient/me/history", authorize("patient"), myRecordsHandler);
+router.get("/patient/me/notifications", authorize("patient"), myNotificationsHandler);
+router.get("/patient/me/export", authorize("patient"), exportMyHistoryHandler);
 
 module.exports = router;

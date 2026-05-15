@@ -42,11 +42,6 @@ const NAV_CONFIG = {
     { label: 'Reports', icon: FlaskConical, to: '/patient/reports' },
     { label: 'Prescriptions', icon: ClipboardList, to: '/patient/prescriptions' }
   ],
-  hospital_admin: [
-    { label: 'Dashboard', icon: LayoutDashboard, to: '/admin' },
-    { label: 'Approvals', icon: ShieldCheck, to: '/admin/approvals' },
-    { label: 'Users', icon: Users, to: '/admin/users' }
-  ],
   medical_superintendent: [
     { label: 'Approvals', icon: ShieldCheck, to: '/admin' }
   ],
@@ -63,7 +58,6 @@ const ROLE_LABELS = {
   lab_technician: 'Laboratory',
   doctor: 'Clinical Review',
   patient: 'Health Records',
-  hospital_admin: 'Administration',
   medical_superintendent: 'Medical Superintendent',
   dmo: 'Digital Surveillance'
 };

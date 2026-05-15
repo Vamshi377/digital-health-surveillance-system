@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const env = require("../config/env");
 const { User } = require("../models/User");
 const { Patient } = require("../models/Patient");
@@ -109,7 +110,7 @@ function buildRoleProfile(role, payload) {
 
 function signAuthToken(user) {
   return jwt.sign(
-    { role: user.role },
+    { role: user.role, authType: user.authType || "user" },
     env.jwtSecret,
     {
       subject: String(user._id),
@@ -182,14 +183,46 @@ async function registerUser(payload) {
 }
 
 async function loginUser(payload) {
-  const { email, password, role } = payload;
+  const { role } = payload;
+  const normalizedRole = normalizeRole(role);
+  if (!normalizedRole) {
+    throw createHttpError(400, "role is required");
+  }
 
-  if (!email || !password || !role) {
+  if (normalizedRole === "patient") {
+    const phoneNumber = String(payload.phoneNumber || "").trim();
+
+    if (!phoneNumber) {
+      throw createHttpError(400, "phoneNumber and role are required for patient login");
+    }
+
+    const patient = await Patient.findOne({ contactNumber: phoneNumber }).lean();
+    if (!patient) {
+      throw createHttpError(401, "Invalid patient credentials");
+    }
+
+    const token = signAuthToken({ _id: patient._id, role: "patient", authType: "patient" });
+
+    return {
+      token,
+      user: {
+        id: patient._id,
+        fullName: patient.fullName,
+        email: "",
+        role: "patient",
+        approvalStatus: "APPROVED",
+        patientCode: patient.patientCode,
+        patientId: patient._id
+      }
+    };
+  }
+
+  const { email, password } = payload;
+  if (!email || !password) {
     throw createHttpError(400, "email, password, and role are required");
   }
 
   const normalizedEmail = String(email).toLowerCase().trim();
-  const normalizedRole = normalizeRole(role);
   const user = await User.findOne({ email: normalizedEmail, isActive: true }).select("+passwordHash");
 
   if (!user) {
@@ -226,4 +259,64 @@ async function loginUser(payload) {
   };
 }
 
-module.exports = { registerUser, loginUser };
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+async function requestPasswordReset(payload) {
+  const email = String(payload.email || "").toLowerCase().trim();
+  const role = normalizeRole(payload.role);
+
+  if (!email || !role) {
+    throw createHttpError(400, "email and role are required");
+  }
+
+  const user = await User.findOne({ email, role, isActive: true });
+  if (!user) {
+    return {
+      message: "If an active account exists, a reset token has been generated."
+    };
+  }
+
+  const resetToken = crypto.randomBytes(24).toString("hex");
+  user.passwordResetTokenHash = hashResetToken(resetToken);
+  user.passwordResetExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await user.save();
+
+  return {
+    message: "Password reset token generated. It expires in 15 minutes.",
+    resetToken
+  };
+}
+
+async function resetPassword(payload) {
+  const token = String(payload.token || "").trim();
+  const password = String(payload.password || "");
+
+  if (!token || !password) {
+    throw createHttpError(400, "token and password are required");
+  }
+
+  if (password.length < 8) {
+    throw createHttpError(400, "Password must be at least 8 characters");
+  }
+
+  const user = await User.findOne({
+    passwordResetTokenHash: hashResetToken(token),
+    passwordResetExpiresAt: { $gt: new Date() },
+    isActive: true
+  }).select("+passwordHash +passwordResetTokenHash");
+
+  if (!user) {
+    throw createHttpError(400, "Invalid or expired reset token");
+  }
+
+  user.passwordHash = await User.hashPassword(password);
+  user.passwordResetTokenHash = null;
+  user.passwordResetExpiresAt = null;
+  await user.save();
+
+  return { message: "Password reset successfully. You can now sign in." };
+}
+
+module.exports = { registerUser, loginUser, requestPasswordReset, resetPassword };
