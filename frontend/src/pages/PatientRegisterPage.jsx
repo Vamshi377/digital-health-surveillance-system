@@ -18,6 +18,27 @@ const EMPTY_FORM = {
   aadharNumber: ''
 };
 
+const digitsOnly = (value) => String(value || '').replace(/\D/g, '');
+
+function buildPatientPayload(form) {
+  const area = form.area.trim();
+  const district = form.city.trim();
+
+  return {
+    fullName: form.fullName.trim(),
+    dateOfBirth: form.dateOfBirth,
+    gender: form.gender,
+    district,
+    city: district,
+    mandal: form.mandal.trim(),
+    village: area,
+    area,
+    addressLine: form.addressLine.trim(),
+    contactNumber: digitsOnly(form.contactNumber),
+    aadharNumber: digitsOnly(form.aadharNumber)
+  };
+}
+
 export default function PatientRegisterPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(EMPTY_FORM);
@@ -32,7 +53,18 @@ export default function PatientRegisterPage() {
     setResult(null);
 
     try {
-      const data = await authService.registerPatientIdentity(form);
+      const payload = buildPatientPayload(form);
+      if (!payload.fullName || !payload.dateOfBirth || !payload.gender || !payload.district || !payload.mandal || !payload.area || !payload.contactNumber || !payload.aadharNumber) {
+        throw new Error('Please fill all required patient registration fields.');
+      }
+      if (payload.contactNumber.length !== 10) {
+        throw new Error('Mobile number must be exactly 10 digits.');
+      }
+      if (payload.aadharNumber.length !== 12) {
+        throw new Error('Aadhaar number must be exactly 12 digits.');
+      }
+
+      const data = await authService.registerPatientIdentity(payload);
       setResult(data);
     } catch (err) {
       setError(err.message);
@@ -105,8 +137,8 @@ export default function PatientRegisterPage() {
             </FormField>
             <FormField label="Mandal" required><Input value={form.mandal} onChange={(event) => setForm((prev) => ({ ...prev, mandal: event.target.value }))} /></FormField>
             <FormField label="Area / Village" required><Input value={form.area} onChange={(event) => setForm((prev) => ({ ...prev, area: event.target.value }))} /></FormField>
-            <FormField label="Mobile Number" required><Input value={form.contactNumber} onChange={(event) => setForm((prev) => ({ ...prev, contactNumber: event.target.value }))} /></FormField>
-            <FormField label="Aadhaar Number" required><Input value={form.aadharNumber} onChange={(event) => setForm((prev) => ({ ...prev, aadharNumber: event.target.value }))} /></FormField>
+            <FormField label="Mobile Number" required><Input value={form.contactNumber} maxLength={10} inputMode="numeric" onChange={(event) => setForm((prev) => ({ ...prev, contactNumber: digitsOnly(event.target.value).slice(0, 10) }))} /></FormField>
+            <FormField label="Aadhaar Number" required><Input value={form.aadharNumber} maxLength={12} inputMode="numeric" onChange={(event) => setForm((prev) => ({ ...prev, aadharNumber: digitsOnly(event.target.value).slice(0, 12) }))} /></FormField>
             <FormField label="Address" style={{ gridColumn: '1 / -1' }}><Textarea value={form.addressLine} onChange={(event) => setForm((prev) => ({ ...prev, addressLine: event.target.value }))} /></FormField>
             <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--neutral-500)', fontSize: '0.82rem' }}>

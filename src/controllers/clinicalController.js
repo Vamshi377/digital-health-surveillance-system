@@ -19,7 +19,7 @@ const {
 
 async function searchPatientHandler(req, res, next) {
   try {
-    const patient = await searchPatient(req.query.phone, req.query.aadharNumber);
+    const patient = await searchPatient(req.query.phone, req.query.aadharNumber, req.user.id);
     return res.status(200).json({ patient });
   } catch (error) {
     return next(error);

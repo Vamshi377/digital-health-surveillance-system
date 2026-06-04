@@ -100,7 +100,7 @@ export default function RegisterPage() {
           <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg,#00e5a0,#00b87a)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Activity size={20} color="#080f1a" strokeWidth={2.5} />
           </div>
-          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>MediSurv</span>
+          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.2rem', color: 'var(--text-primary)' }}>MediTrack</span>
         </div>
 
         <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xl)', padding: '36px' }}>

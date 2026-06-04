@@ -90,7 +90,7 @@ export default function Sidebar({ open, setOpen }) {
             <Activity size={20} className="text-slate-950" />
           </div>
           <div>
-            <div className="font-display text-xl font-bold tracking-tight text-slate-900">MediSurv</div>
+            <div className="font-display text-xl font-bold tracking-tight text-slate-900">MediTrack</div>
             <div className="text-xs text-slate-500">Disease intelligence network</div>
           </div>
         </div>

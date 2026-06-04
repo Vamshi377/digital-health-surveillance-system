@@ -135,7 +135,7 @@ export default function NurseDashboard() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
-                      {patient.fullName || 'Unknown Patient'}
+                      {patient.fullName || 'Patient'}
                     </div>
                     <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {[patient.patientCode, appt.reason, patient.age ? `${patient.age}y` : null].filter(Boolean).join(' · ')}

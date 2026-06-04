@@ -26,6 +26,18 @@ function isObjectId(value) {
   return /^[0-9a-fA-F]{24}$/.test(String(value || ""));
 }
 
+function normalizePhoneNumber(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) {
+    return digits.slice(-10);
+  }
+  return digits;
+}
+
+function normalizeAadharNumber(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 function buildHospitalPatientId(hospitalId) {
   const prefix = String(hospitalId || "HOSP").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || "HOSP";
   const random = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -230,8 +242,8 @@ function buildRiskInsight(predictions) {
 }
 
 async function searchPatient(phone, aadharNumber, actorId = null) {
-  const normalizedPhone = phone ? String(phone).trim() : "";
-  const normalizedAadhar = aadharNumber ? String(aadharNumber).trim() : "";
+  const normalizedPhone = phone ? normalizePhoneNumber(phone) : "";
+  const normalizedAadhar = aadharNumber ? normalizeAadharNumber(aadharNumber) : "";
 
   if (!normalizedPhone && !normalizedAadhar) {
     throw createHttpError(400, "phone or aadharNumber is required");
@@ -310,11 +322,11 @@ async function registerPatient(payload, actorId) {
     throw createHttpError(400, "Valid age or dateOfBirth is required");
   }
 
-  const normalizedPhone = String(contactNumber || "").trim();
+  const normalizedPhone = normalizePhoneNumber(contactNumber);
   if (!/^\d{10}$/.test(normalizedPhone)) {
     throw createHttpError(400, "Contact number must be exactly 10 digits");
   }
-  const normalizedAadhar = String(aadharNumber || "").trim();
+  const normalizedAadhar = normalizeAadharNumber(aadharNumber);
   if (!/^\d{12}$/.test(normalizedAadhar)) {
     throw createHttpError(400, "Aadhar number must be exactly 12 digits");
   }
@@ -425,8 +437,8 @@ async function selfRegisterPatient(payload) {
     throw createHttpError(400, "Valid age or dateOfBirth is required");
   }
 
-  const normalizedPhone = String(contactNumber || "").trim();
-  const normalizedAadhar = String(aadharNumber || "").trim();
+  const normalizedPhone = normalizePhoneNumber(contactNumber);
+  const normalizedAadhar = normalizeAadharNumber(aadharNumber);
   if (!/^\d{10}$/.test(normalizedPhone)) {
     throw createHttpError(400, "Contact number must be exactly 10 digits");
   }
@@ -520,7 +532,7 @@ async function getNurseQueue() {
   const endOfDay = new Date(now);
   endOfDay.setHours(23, 59, 59, 999);
 
-  return Appointment.find({
+  const appointments = await Appointment.find({
     status: "scheduled",
     $or: [
       { visitDate: { $gte: startOfDay, $lte: endOfDay } },
@@ -533,6 +545,8 @@ async function getNurseQueue() {
     .populate("patient", "patientCode fullName age gender district mandal village ward area contactNumber")
     .sort({ visitDate: 1, scheduledAt: 1 })
     .lean();
+
+  return appointments.filter((appointment) => appointment.patient);
 }
 
 async function createMedicalRecord(appointmentId, payload, actorId) {
@@ -795,7 +809,7 @@ async function getDoctorDashboard() {
     .sort({ createdAt: -1 })
     .lean();
 
-  return records;
+  return records.filter((record) => record.patient);
 }
 
 async function getPatientHistory(patientId, actorId) {

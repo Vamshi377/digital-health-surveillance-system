@@ -121,7 +121,7 @@ export default function LoginPage() {
               <Activity size={28} className="text-slate-900" />
             </div>
             <div>
-              <div className="font-display text-3xl font-bold tracking-tight text-slate-900">MediSurv</div>
+              <div className="font-display text-3xl font-bold tracking-tight text-slate-900">MediTrack</div>
               <div className="text-sm text-slate-500">Digital health surveillance platform</div>
             </div>
           </div>

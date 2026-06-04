@@ -28,6 +28,27 @@ const EMPTY_APPOINTMENT_FORM = {
   reason: ''
 };
 
+const digitsOnly = (value) => String(value || '').replace(/\D/g, '');
+
+function buildPatientPayload(form) {
+  const area = form.area.trim();
+  const district = form.city.trim();
+
+  return {
+    fullName: form.fullName.trim(),
+    dateOfBirth: form.dateOfBirth,
+    gender: form.gender,
+    district,
+    city: district,
+    mandal: form.mandal.trim(),
+    village: area,
+    area,
+    addressLine: form.addressLine.trim(),
+    contactNumber: digitsOnly(form.contactNumber),
+    aadharNumber: digitsOnly(form.aadharNumber)
+  };
+}
+
 export default function ReceptionDashboard() {
   const location = useLocation();
   const [search, setSearch] = useState({ phone: '', aadharNumber: '' });
@@ -54,7 +75,10 @@ export default function ReceptionDashboard() {
     resetFeedback();
     setLoadingSearch(true);
     try {
-      const data = await clinicalService.searchPatient(search);
+      const data = await clinicalService.searchPatient({
+        phone: digitsOnly(search.phone),
+        aadharNumber: digitsOnly(search.aadharNumber)
+      });
       setPatient(data?.patient || null);
       if (data?.patient) {
         setMessage(`Patient found: ${data.patient.fullName}. Hospital Patient ID: ${data.patient.hospitalPatientId || '-'}. Global Patient ID: ${data.patient.patientCode}`);
@@ -72,9 +96,23 @@ export default function ReceptionDashboard() {
 
   const handleRegister = async () => {
     resetFeedback();
+    const payload = buildPatientPayload(registerForm);
+    if (!payload.fullName || !payload.dateOfBirth || !payload.gender || !payload.district || !payload.mandal || !payload.area || !payload.contactNumber || !payload.aadharNumber) {
+      setError('Please fill all required patient registration fields.');
+      return;
+    }
+    if (payload.contactNumber.length !== 10) {
+      setError('Contact number must be exactly 10 digits.');
+      return;
+    }
+    if (payload.aadharNumber.length !== 12) {
+      setError('Aadhaar number must be exactly 12 digits.');
+      return;
+    }
+
     setSavingPatient(true);
     try {
-      const data = await clinicalService.registerPatient(registerForm);
+      const data = await clinicalService.registerPatient(payload);
       const createdPatient = data?.patient || null;
       setPatient(createdPatient);
       setRegisterForm(EMPTY_PATIENT_FORM);
@@ -132,10 +170,10 @@ export default function ReceptionDashboard() {
           <SectionCard title="Find Existing Patient" subtitle="Search by registered mobile number or Aadhaar number">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <FormField label="Phone Number">
-              <Input value={search.phone} onChange={(event) => setSearch((prev) => ({ ...prev, phone: event.target.value }))} placeholder="10 digit phone" />
+              <Input value={search.phone} maxLength={10} inputMode="numeric" onChange={(event) => setSearch((prev) => ({ ...prev, phone: digitsOnly(event.target.value).slice(0, 10) }))} placeholder="10 digit phone" />
             </FormField>
             <FormField label="Aadhaar Number">
-              <Input value={search.aadharNumber} onChange={(event) => setSearch((prev) => ({ ...prev, aadharNumber: event.target.value }))} placeholder="12 digit Aadhaar" />
+              <Input value={search.aadharNumber} maxLength={12} inputMode="numeric" onChange={(event) => setSearch((prev) => ({ ...prev, aadharNumber: digitsOnly(event.target.value).slice(0, 12) }))} placeholder="12 digit Aadhaar" />
             </FormField>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
               <Button icon={Search} loading={loadingSearch} onClick={handleSearch}>Search Patient</Button>
@@ -182,8 +220,8 @@ export default function ReceptionDashboard() {
             </FormField>
             <FormField label="Mandal" required><Input value={registerForm.mandal} onChange={(event) => setRegisterForm((prev) => ({ ...prev, mandal: event.target.value }))} /></FormField>
             <FormField label="Area / Village" required><Input value={registerForm.area} onChange={(event) => setRegisterForm((prev) => ({ ...prev, area: event.target.value }))} /></FormField>
-            <FormField label="Contact Number" required><Input value={registerForm.contactNumber} onChange={(event) => setRegisterForm((prev) => ({ ...prev, contactNumber: event.target.value }))} /></FormField>
-            <FormField label="Aadhar Number" required><Input value={registerForm.aadharNumber} onChange={(event) => setRegisterForm((prev) => ({ ...prev, aadharNumber: event.target.value }))} /></FormField>
+            <FormField label="Contact Number" required><Input value={registerForm.contactNumber} maxLength={10} inputMode="numeric" onChange={(event) => setRegisterForm((prev) => ({ ...prev, contactNumber: digitsOnly(event.target.value).slice(0, 10) }))} /></FormField>
+            <FormField label="Aadhaar Number" required><Input value={registerForm.aadharNumber} maxLength={12} inputMode="numeric" onChange={(event) => setRegisterForm((prev) => ({ ...prev, aadharNumber: digitsOnly(event.target.value).slice(0, 12) }))} /></FormField>
             <FormField label="Address" style={{ gridColumn: '1 / -1' }}><Textarea value={registerForm.addressLine} onChange={(event) => setRegisterForm((prev) => ({ ...prev, addressLine: event.target.value }))} /></FormField>
             <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
               <Button icon={UserPlus} loading={savingPatient} onClick={handleRegister}>Register Patient</Button>

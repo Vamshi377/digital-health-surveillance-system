@@ -44,6 +44,8 @@ async function authenticate(req, res, next) {
       email: user.email,
       role: normalizeRole(user.role),
       approvalStatus: user.approvalStatus,
+      hospitalId: user.hospitalId || "",
+      hospitalName: user.hospitalName || "",
       patientId: user.patientId ? String(user.patientId) : null
     };
 

@@ -13,6 +13,31 @@ const DISTRICTS = [
   'Warangal','Yadadri Bhongir',
 ]
 
+const digitsOnly = (value) => String(value || '').replace(/\D/g, '')
+
+function getApiErrorMessage(err, fallback) {
+  return err.response?.data?.error || err.response?.data?.message || err.message || fallback
+}
+
+function buildPatientPayload(form) {
+  const area = form.area.trim()
+  const district = form.city.trim()
+
+  return {
+    fullName: form.fullName.trim(),
+    dateOfBirth: form.dateOfBirth,
+    gender: form.gender,
+    district,
+    city: district,
+    mandal: form.mandal.trim(),
+    village: area,
+    area,
+    addressLine: form.addressLine.trim(),
+    contactNumber: digitsOnly(form.contactNumber),
+    aadharNumber: digitsOnly(form.aadharNumber),
+  }
+}
+
 export default function ReceptionDashboard() {
   const [phone, setPhone] = useState('')
   const [searchResult, setSearchResult] = useState(null)
@@ -31,18 +56,19 @@ export default function ReceptionDashboard() {
   const [apptForm, setApptForm] = useState({ scheduledAt: '', reason: '' })
 
   const handleSearch = async () => {
-    if (!phone.trim()) return
+    const normalizedPhone = digitsOnly(phone).slice(-10)
+    if (!normalizedPhone) return
     setSearching(true)
     setSearchErr('')
     setSearchResult(null)
     try {
-      const res = await clinicalAPI.searchPatientByPhone(phone)
+      const res = await clinicalAPI.searchPatientByPhone(normalizedPhone)
       setSearchResult(res.data.patient || res.data)
     } catch (err) {
-      if (err.response?.status === 404) {
+      if (err.response?.status === 404 || !err.response?.data?.patient) {
         setSearchErr('No patient found with this phone number. You can register them below.')
       } else {
-        setSearchErr(err.response?.data?.message || 'Search failed. Check backend connection.')
+        setSearchErr(getApiErrorMessage(err, 'Search failed. Check backend connection.'))
       }
     } finally {
       setSearching(false)
@@ -51,16 +77,30 @@ export default function ReceptionDashboard() {
 
   const handleRegister = async (e) => {
     e.preventDefault()
+    const payload = buildPatientPayload(regForm)
+    if (!payload.fullName || !payload.dateOfBirth || !payload.gender || !payload.district || !payload.mandal || !payload.area || !payload.contactNumber || !payload.aadharNumber) {
+      setAlert({ type: 'error', message: 'Please fill all required patient registration fields.' })
+      return
+    }
+    if (payload.contactNumber.length !== 10) {
+      setAlert({ type: 'error', message: 'Contact number must be exactly 10 digits.' })
+      return
+    }
+    if (payload.aadharNumber.length !== 12) {
+      setAlert({ type: 'error', message: 'Aadhaar number must be exactly 12 digits.' })
+      return
+    }
+
     setPatientLoading(true)
     try {
-      const res = await clinicalAPI.createPatient(regForm)
+      const res = await clinicalAPI.createPatient(payload)
       const patient = res.data.patient || res.data
       setSearchResult(patient)
       setShowRegister(false)
       setAlert({ type: 'success', message: `Patient registered! Code: ${patient.patientCode}` })
       setRegForm({ fullName: '', dateOfBirth: '', gender: '', contactNumber: '', aadharNumber: '', city: '', mandal: '', area: '', addressLine: '' })
     } catch (err) {
-      setAlert({ type: 'error', message: err.response?.data?.message || 'Registration failed.' })
+      setAlert({ type: 'error', message: getApiErrorMessage(err, 'Registration failed.') })
     } finally {
       setPatientLoading(false)
     }
@@ -100,7 +140,9 @@ export default function ReceptionDashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: '10px', marginBottom: '20px' }}>
             <input
               value={phone}
-              onChange={e => { setPhone(e.target.value); setSearchErr('') }}
+              onChange={e => { setPhone(digitsOnly(e.target.value).slice(0, 10)); setSearchErr('') }}
+              maxLength={10}
+              inputMode="numeric"
               placeholder="+91 9XXXXXXXXX"
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
             />
@@ -189,7 +231,7 @@ export default function ReceptionDashboard() {
               </select>
             </FormField>
             <FormField label="Contact Number">
-              <input value={regForm.contactNumber} onChange={e => setRegForm(f => ({ ...f, contactNumber: e.target.value }))} placeholder="+91 9XXXXXXXXX" required />
+              <input value={regForm.contactNumber} onChange={e => setRegForm(f => ({ ...f, contactNumber: digitsOnly(e.target.value).slice(0, 10) }))} maxLength={10} inputMode="numeric" placeholder="10 digit mobile number" required />
             </FormField>
             <FormField label="District">
               <select value={regForm.city} onChange={e => setRegForm(f => ({ ...f, city: e.target.value }))} required>
@@ -204,7 +246,7 @@ export default function ReceptionDashboard() {
               <input value={regForm.area} onChange={e => setRegForm(f => ({ ...f, area: e.target.value }))} placeholder="e.g. Kukatpally" required />
             </FormField>
             <FormField label="Aadhar Number">
-              <input value={regForm.aadharNumber} onChange={e => setRegForm(f => ({ ...f, aadharNumber: e.target.value }))} placeholder="12 digit Aadhar" required />
+              <input value={regForm.aadharNumber} onChange={e => setRegForm(f => ({ ...f, aadharNumber: digitsOnly(e.target.value).slice(0, 12) }))} maxLength={12} inputMode="numeric" placeholder="12 digit Aadhaar" required />
             </FormField>
           </div>
           <FormField label="Address">

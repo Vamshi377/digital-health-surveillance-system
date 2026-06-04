@@ -8,6 +8,14 @@ const { USER_ROLES, normalizeRole, getRequiredApproverRole } = require("../utils
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function normalizePhoneNumber(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) {
+    return digits.slice(-10);
+  }
+  return digits;
+}
+
 function validateRegisterInput(payload) {
   const { fullName, email, password, phoneNumber, hospitalId, hospitalName, role } = payload;
 
@@ -190,7 +198,7 @@ async function loginUser(payload) {
   }
 
   if (normalizedRole === "patient") {
-    const phoneNumber = String(payload.phoneNumber || "").trim();
+    const phoneNumber = normalizePhoneNumber(payload.phoneNumber);
 
     if (!phoneNumber) {
       throw createHttpError(400, "phoneNumber and role are required for patient login");

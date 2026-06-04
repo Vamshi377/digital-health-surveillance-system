@@ -32,9 +32,10 @@ export default function DoctorDashboard() {
     setError('')
     try {
       const res = await clinicalAPI.getDoctorDashboard()
-      setQueue(res.data.records || res.data || [])
+      const records = res.data.records || res.data || []
+      setQueue(records.filter(record => record?.patient?._id || record?.patient?.patientCode))
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load records. Check backend connection.')
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to load records. Check backend connection.')
       setQueue([])
     } finally {
       setLoading(false)
@@ -50,7 +51,7 @@ export default function DoctorDashboard() {
       const res = await clinicalAPI.getRecordSummary(record._id)
       setSummary(res.data)
     } catch (err) {
-      setSummaryError(err.response?.data?.message || 'Failed to load patient summary.')
+      setSummaryError(err.response?.data?.error || err.response?.data?.message || 'Failed to load patient summary.')
     } finally {
       setSummaryLoading(false)
     }
@@ -165,7 +166,7 @@ export default function DoctorDashboard() {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {patient.fullName || 'Unknown Patient'}
+                        {patient.fullName || 'Patient'}
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                         {[patient.patientCode, patient.age ? `${patient.age}y` : null].filter(Boolean).join(' · ')}
